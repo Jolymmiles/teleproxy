@@ -6,6 +6,48 @@ High-performance MT-Proto proxy for Telegram with DPI resistance, fake-TLS camou
 
 **Features**: Fake-TLS (EE mode), Direct-to-DC, Dynamic Record Sizing, IP access control, Prometheus metrics, multi-secret support with labels, static binaries, Docker, ARM64.
 
+## Comparison
+
+Comparison with [TelegramMessenger/MTProxy](https://github.com/TelegramMessenger/MTProxy) (upstream, abandoned) and the main third-party alternatives.
+
+| Feature | [Original](https://github.com/TelegramMessenger/MTProxy) | **[Teleproxy](https://github.com/teleproxy/teleproxy)** | [mtg](https://github.com/9seconds/mtg) | [telemt](https://github.com/telemt/telemt) |
+|---------|:---:|:---:|:---:|:---:|
+| **Language** | C | C | Go | Rust |
+| ***Protocol*** | | | | |
+| Fake-TLS (EE mode) | Yes | Yes | Yes | Yes |
+| Direct-to-DC mode | No | Yes | Yes | Yes |
+| Ad proxy tag | Yes | Yes | No | Yes |
+| Multiple secrets | Yes | Yes (up to 16, with labels) | No | Yes |
+| Anti-replay protection | Weak | Yes | Yes | Partial |
+| Constant-time HMAC | No | Yes | — | Yes |
+| ***DPI resistance*** | | | | |
+| Custom TLS backend (TCP splitting) | Yes | Yes | No | Yes |
+| Dynamic Record Sizing (DRS) | No | Yes | Yes | No |
+| Traffic mimicry (DRS + timing) | No | Yes | Yes | No |
+| SOCKS5 upstream proxy | No | No | Yes | Yes |
+| ***Access control*** | | | | |
+| IP blocklist / allowlist | No | Yes | Yes | No |
+| Per-user unique IP limits | No | No | No | Yes |
+| Proxy Protocol v1/v2 | No | No | Yes | Yes |
+| ***Deployment*** | | | | |
+| Docker image | ~57 MB | ~8 MB | ~3.5 MB | ~5 MB |
+| ARM64 / Apple Silicon | No | Yes | Yes | Yes |
+| IPv6 | Yes | Yes | Yes | Yes |
+| Multi-worker processes | Yes | Yes | — | — |
+| Static binary releases | No | Yes | Yes | Yes |
+| RPM packages | No | Yes | No | No |
+| Systemd integration | Partial | Yes | — | Yes |
+| ***Monitoring & management*** | | | | |
+| Prometheus metrics | No | Yes | Yes | Yes |
+| HTTP stats endpoint | Yes | Yes | — | Yes |
+| REST management API | No | No | No | Yes |
+| Auto config refresh | No | Yes | Yes | Yes |
+| Health checks | No | Yes | Yes | Yes |
+| ***Testing & quality*** | | | | |
+| Fuzz testing (CI) | No | Yes | No | Partial |
+| E2E tests (real Telegram clients) | No | Yes | No | No |
+| Static analysis (CI) | No | Yes | Yes | — |
+
 ## Install
 
 ### Static Binary (Any Linux)
