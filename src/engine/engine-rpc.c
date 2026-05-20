@@ -105,6 +105,7 @@ static struct tree_rpc_custom_op *rpc_custom_op_tree;
 
 void register_custom_op_cb (unsigned op, void (*func)(struct tl_in_state *tlio_in, struct query_work_params *params)) {
   struct rpc_custom_op *O = malloc (sizeof (*O));
+  assert (O);
   O->op = op;
   O->func = func;
   rpc_custom_op_tree = tree_insert_rpc_custom_op (rpc_custom_op_tree, O, lrand48 ());
@@ -147,6 +148,9 @@ void tl_default_act_free (struct tl_act_extra *extra) {
 
 struct tl_act_extra *tl_default_act_dup (struct tl_act_extra *extra) {
   struct tl_act_extra *new = malloc (extra->size);
+  if (!new) {
+    return NULL;
+  }
   memcpy (new, extra, extra->size);
   new->flags = new->flags | 3;
   return new;
@@ -162,6 +166,7 @@ static tl_query_result_fun_t *tl_query_result_functions = NULL;
 void tl_query_result_fun_set (tl_query_result_fun_t func, int query_type_id) {
   if (!tl_query_result_functions) {
     tl_query_result_functions = calloc (sizeof (void *), 16);
+    assert (tl_query_result_functions);
   }
   tl_query_result_functions[query_type_id] = func;
 }
@@ -381,6 +386,7 @@ static int process_act_atom_subjob (job_t job, int op, struct job_thread *JT) /*
       if (res >= 0 && !IO->error) {
         //assert (TL_OUT_RAW_MSG);
         struct raw_message *raw = malloc (sizeof (*raw));
+        assert (raw);
         rwm_clone (raw, (struct raw_message *)IO->out);
         tl_out_state_free (IO);
         if (E->raw) {

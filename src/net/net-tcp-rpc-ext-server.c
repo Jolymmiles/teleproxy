@@ -147,6 +147,7 @@ int tcp_proxy_pass_parse_execute (connection_job_t C) {
   struct connection_info *e = CONN_INFO(E);
 
   struct raw_message *r = malloc (sizeof (*r));
+  assert (r);
   rwm_move (r, &c->in);
   rwm_init (&c->in, 0);
   vkprintf (3, "proxying %d bytes to %s:%d\n", r->total_bytes, show_remote_ip (E), e->remote_port);
@@ -1135,6 +1136,7 @@ static int have_client_random (unsigned char random[16]) {
 
 static void add_client_random (unsigned char random[16]) {
   struct client_random *entry = malloc (sizeof (struct client_random));
+  assert (entry);
   memcpy (entry->random, random, 16);
   entry->time = now;
   entry->next_by_time = NULL;
@@ -1656,11 +1658,13 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
            is queued, producing separate TCP segments.  This defeats DPI
            that pattern-matches the full handshake in a single packet. */
         struct raw_message *m1 = calloc (sizeof (struct raw_message), 1);
+        assert (m1);
         rwm_create (m1, response_buffer, 127);              /* ServerHello record */
         mpq_push_w (c->out_queue, m1, 0);
         job_signal (JOB_REF_CREATE_PASS (C), JS_RUN);
 
         struct raw_message *m2 = calloc (sizeof (struct raw_message), 1);
+        assert (m2);
         rwm_create (m2, response_buffer + 127, response_size - 127); /* CCS + AppData */
         mpq_push_w (c->out_queue, m2, 0);
         job_signal (JOB_REF_CREATE_PASS (C), JS_RUN);
