@@ -38,7 +38,7 @@ theme:
     repo: fontawesome/brands/github
 
 extra:
-  version: "4.9.0"
+  version: "4.13.0"
 
 extra_css:
   - assets/extra.css

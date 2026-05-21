@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [4.13.0] - 2026-05-21
 
 - Wildcard certificate support in fake-TLS mode (#44). `-D '*.example.com:backend:443'`
   matches any single-label subdomain of `example.com` against the configured
@@ -28,6 +28,14 @@
 - New `make test-handshake-timeout` regression test asserts
   `total_connections` returns to baseline within 15 seconds of opening junk
   sockets.
+- Document direct-mode limitations (#79). The `--direct` page now spells out
+  what skipping Telegram's middle-end trades away: media on non-Premium
+  accounts may not load, sponsored channels aren't delivered, and voice/video
+  calls aren't carried by any MTProto proxy regardless of mode. Answers the
+  recurring symptom reported in #60.
+- Memory-handling robustness in `src/common/common-stats.c` and assorted free
+  paths (#84, #85, #82). `cppcheck --check-level=exhaustive` findings are now
+  gated in CI (#78) so future OOM-path regressions surface before merge.
 
 ## [4.12.2]
 
