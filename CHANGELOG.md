@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.14.0] - 2026-05-30
+
+- Automatic ClientHello fragmentation against TSPU JA4 fingerprinting (#39).
+  The MTProxy listening socket now announces a 256-byte TCP MSS in the SYN-ACK,
+  forcing the client kernel to chop its outgoing ClientHello across 2-3 TCP
+  segments. ALPN and signature_algorithms — required inputs to JA4 — land in
+  segments 2/3, so a single-packet JA4 extractor computes the wrong hash and
+  the connection slips past the signature. No configuration; no client change
+  required. The HTTP `/stats` and `/metrics` listener keeps the system default
+  MSS. Trade-off: Linux caps server→client segments at the same MSS, raising
+  packet count ~5× and TCP/IP header overhead from ~3% to ~15% on the proxy
+  listener — measurable on bandwidth-saturated deployments but well within
+  the timeout of the existing 20MB MTProto E2E test.
+
 ## [4.13.0] - 2026-05-21
 
 - Wildcard certificate support in fake-TLS mode (#44). `-D '*.example.com:backend:443'`

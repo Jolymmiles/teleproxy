@@ -37,6 +37,14 @@ TLS record sizes follow a graduated pattern matching real web servers (Cloudflar
 
 The ServerHello encrypted payload size varies by up to ±32 bytes across connections, mimicking the natural variation in certificate chain and session ticket sizes seen from real TLS servers. The ServerHello and ChangeCipherSpec are sent as separate TCP segments to prevent DPI from matching the full handshake response in a single packet.
 
+### Forced ClientHello fragmentation (automatic)
+
+Teleproxy announces a small TCP Maximum Segment Size (256 bytes) in the SYN-ACK on its public listening port. The client kernel obeys the limit and chops the outgoing ClientHello (~500-700 bytes) into 2-3 TCP segments. Critically, ALPN and `signature_algorithms` — both required inputs to the JA4 hash — typically land in segment 2 or 3 of a real Telegram ClientHello, so a DPI that fingerprints from the first segment alone computes the wrong hash.
+
+This is automatic, requires no configuration, and works against unmodified Telegram clients on every platform. The HTTP `/stats` and `/metrics` listener uses the full system MSS and is unaffected.
+
+Trade-off: Linux applies the listening-socket MSS to both directions of each accepted connection, so server→client segments are also capped at 256 bytes. Packet count rises ~5× compared to MSS=1460 and per-byte TCP/IP header overhead grows from ~3% to ~15%. On modern hardware with TSO/GSO offload, CPU cost stays manageable, and a 20MB MTProto download still completes well inside any sensible timeout. Bandwidth-saturated proxies will see a measurable throughput cap; heavy operators who would rather take the JA4 detection risk than the overhead can rebuild without the `SM_LOWMSS` bit — but the default ships with fragmentation on because for most users a working proxy that runs slower beats a fast proxy that gets blocked.
+
 ### GREASE randomization
 
 Each ClientHello (for upstream domain probing) uses fresh GREASE values per RFC 8701, preventing static fingerprint matching.
@@ -84,8 +92,8 @@ These tools work because Russian DPI matches patterns on **intact TCP segments**
 !!! tip "Keep Telegram updated"
     Telegram Desktop [fixed several TLS fingerprint artifacts](https://github.com/telegramdesktop/tdesktop/pull/30513) that DPI exploited. Mobile clients (Android/iOS) typically receive these fixes in subsequent updates. Always use the latest version.
 
-## What Cannot Be Fixed Server-Side
+## What Cannot Be Fully Fixed Server-Side
 
-- **Client TLS fingerprint**: The Telegram app controls the ClientHello content. Server-side proxy code cannot alter what the client sends.
+- **Client TLS fingerprint content**: The Telegram app controls the byte-for-byte content of the ClientHello. Server-side proxy code cannot alter what the client puts on the wire. We can, however, force the *kernel* of the connecting client to spread those bytes across multiple TCP segments — see [Forced ClientHello fragmentation](#forced-clienthello-fragmentation-automatic) above. This raises the cost of single-packet JA4 matching for DPI but does not invalidate the fingerprint if the DPI fully reassembles TCP streams.
 - **IP/L3 blocking**: When DPI blocks Telegram's IP ranges at the network layer, only a VPN or intermediate relay can help.
 - **TSPU deployment**: Whether an ISP's DPI detects the traffic depends on their TSPU hardware/software version — this varies by operator and region.
