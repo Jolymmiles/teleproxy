@@ -91,7 +91,7 @@ int hexdump (const void *start, const void *end) {
       }
     }
     s[p ++] = '\n';
-    write (2, s, p);
+    if (write (2, s, p)) {}
     ptr += 16;
   }
   return end - start;
