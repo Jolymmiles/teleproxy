@@ -209,12 +209,14 @@ struct mp_queue_block *alloc_mpq_block (mqn_value_t first_val, int allow_recursi
     if (is_small) {
       int t = __sync_fetch_and_add (&mpq_small_blocks_allocated, 1);
       if (t >= mpq_small_blocks_allocated_max) {
-	__sync_bool_compare_and_swap (&mpq_small_blocks_allocated_max, mpq_small_blocks_allocated_max, t + 1);
+	int expected_max = mpq_small_blocks_allocated_max;
+	__atomic_compare_exchange_n (&mpq_small_blocks_allocated_max, &expected_max, t + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
       }
     } else {
       int t = __sync_fetch_and_add (&mpq_blocks_allocated, 1);
       if (t >= mpq_blocks_allocated_max) {
-	__sync_bool_compare_and_swap (&mpq_blocks_allocated_max, mpq_blocks_allocated_max, t + 1);
+	int expected_max = mpq_blocks_allocated_max;
+	__atomic_compare_exchange_n (&mpq_blocks_allocated_max, &expected_max, t + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
       }
     }
   } else {
@@ -272,9 +274,10 @@ static inline void mpq_fix_state (struct mp_queue_block *QB) {
     if (QB->mqb_tail != t) {
       continue;
     }
-    // here tail < head ; try to advance tail to head 
+    // here tail < head ; try to advance tail to head
     // (or to some value h such that tail < h <= head)
-    if (__sync_bool_compare_and_swap (&QB->mqb_tail, t, h)) {
+    long expected_tail = t;
+    if (__atomic_compare_exchange_n (&QB->mqb_tail, &expected_tail, h, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       break;
     }
   }
@@ -304,21 +307,24 @@ mqn_value_t mpq_block_pop (struct mp_queue_block *QB) {
 	if (idx == h) {
 	  e.idx = safe_idx + size;
 	  e.val = 0;
-	  if (__sync_bool_compare_and_swap (&node->pair, d.pair, e.pair)) {
+	  DLONG expected_pair = d.pair;
+	  if (__atomic_compare_exchange_n (&node->pair, &expected_pair, e.pair, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 	    // fprintf (stderr, "%d:  mpq_block_pop(%ld) -> %lx\n", mpq_this_thread_id, h, (long) val);
 	    return val;
 	  }
 	} else {
 	  e.val = val;
 	  e.idx = idx; // clear 'safe' flag
-	  if (__sync_bool_compare_and_swap (&node->pair, d.pair, e.pair)) {
+	  DLONG expected_pair = d.pair;
+	  if (__atomic_compare_exchange_n (&node->pair, &expected_pair, e.pair, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 	    break;
 	  }
 	}
       } else {
 	e.idx = (safe_idx & MQN_SAFE) + h + size;
 	e.val = 0;
-	if (__sync_bool_compare_and_swap (&node->pair, d.pair, e.pair)) {
+	DLONG expected_pair = d.pair;
+	if (__atomic_compare_exchange_n (&node->pair, &expected_pair, e.pair, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 	  break;
 	}
       }
@@ -358,7 +364,8 @@ long mpq_block_push (struct mp_queue_block *QB, mqn_value_t val) {
       d.val = 0;
       e.idx = MQN_SAFE + t;
       e.val = val;
-      if (__sync_bool_compare_and_swap (&node->pair, d.pair, e.pair)) {
+      DLONG expected_pair = d.pair;
+      if (__atomic_compare_exchange_n (&node->pair, &expected_pair, e.pair, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 	// fprintf (stderr, "%d:  mpq_block_push(%ld) <- %lx\n", mpq_this_thread_id, t, (long) val);
 	return t; // pushed OK
       }
@@ -460,7 +467,8 @@ mqn_value_t mpq_pop (struct mp_queue *MQ, int flags) {
     if (v) {
       break;
     }
-    if (__sync_bool_compare_and_swap (&MQ->mq_head, QB, QB->mqb_next)) {
+    struct mp_queue_block *expected_head = QB;
+    if (__atomic_compare_exchange_n (&MQ->mq_head, &expected_head, QB->mqb_next, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       // want to free QB here, but this is complicated if somebody else holds a pointer
       if (is_hazard_ptr (QB, 0, 2) <= 1) {
 	free_mpq_block (QB);
@@ -512,7 +520,8 @@ int mpq_is_empty (struct mp_queue *MQ) {
       *hptr = 0;
       return 1;
     }
-    if (__sync_bool_compare_and_swap (&MQ->mq_head, QB, QB->mqb_next)) {
+    struct mp_queue_block *expected_head = QB;
+    if (__atomic_compare_exchange_n (&MQ->mq_head, &expected_head, QB->mqb_next, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       // want to free QB here, but this is complicated if somebody else holds a pointer
       if (is_hazard_ptr (QB, 0, 2) <= 1) {
 	free_mpq_block (QB);
@@ -544,7 +553,8 @@ long mpq_push (struct mp_queue *MQ, mqn_value_t val, int flags) {
     }
 
     if (QB->mqb_next) {
-      __sync_bool_compare_and_swap (&MQ->mq_tail, QB, QB->mqb_next);
+      struct mp_queue_block *expected_tail = QB;
+      __atomic_compare_exchange_n (&MQ->mq_tail, &expected_tail, QB->mqb_next, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
       continue;
     }
     long pos = mpq_block_push (QB, val);
@@ -579,8 +589,10 @@ long mpq_push (struct mp_queue *MQ, mqn_value_t val, int flags) {
     }    
     assert (hptr[r] == QB);
     DBG('D')
-    if (__sync_bool_compare_and_swap (&QB->mqb_next, 0, NQB)) {
-      __sync_bool_compare_and_swap (&MQ->mq_tail, QB, NQB);
+    struct mp_queue_block *expected_next = 0;
+    if (__atomic_compare_exchange_n (&QB->mqb_next, &expected_next, NQB, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+      struct mp_queue_block *expected_tail = QB;
+      __atomic_compare_exchange_n (&MQ->mq_tail, &expected_tail, NQB, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
       DBG('E')
       if (flags & MPQF_STORE_PTR) {
 	hptr[2] = NQB;

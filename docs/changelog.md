@@ -4,6 +4,15 @@ description: "Release history for Teleproxy. Version details, new features, bug 
 
 # Changelog
 
+## 4.16.0
+
+- **Fix high idle CPU usage with worker processes** ([#129](https://github.com/teleproxy/teleproxy/issues/129)). The master now enters the normal epoll sleep path when there are no active special connections instead of waking every 1-2 ms merely because workers are configured.
+- **Portable ARM64 atomics** ([#131](https://github.com/teleproxy/teleproxy/issues/131)). Legacy `__sync` compare-and-swap operations are now `__atomic_compare_exchange_n` calls, with `libatomic` linked on Linux and included in the runtime image for non-lock-free 16-byte operations.
+- **Broader TLS 1.3 camouflage backend compatibility** ([#105](https://github.com/teleproxy/teleproxy/issues/105)). Startup probing and `teleproxy check` now accept valid TLS 1.3 servers that omit the optional compatibility ChangeCipherSpec record.
+- **Complete TOML configuration reference** ([#108](https://github.com/teleproxy/teleproxy/issues/108)). The new guide covers every native option, defaults, fake-TLS backends, per-secret limits, ACLs, direct DC overrides, and reload behavior.
+- **Clarify stats endpoint access** ([#127](https://github.com/teleproxy/teleproxy/issues/127)). `/stats` and `/link` deliberately return 404 outside their allowlist; Docker now publishes the stats port on loopback by default, and the docs show secure SSH-tunnel access.
+- **Correct SOCKS5 requirements** ([#123](https://github.com/teleproxy/teleproxy/issues/123)). Upstream SOCKS5 routing is available only in direct-to-DC mode, and all examples now set `direct = true`.
+
 ## 4.15.0
 
 - **ClientHello JA4 fingerprint distribution on `/stats` and `/metrics`** ([#102](https://github.com/teleproxy/teleproxy/issues/102), follow-up to [#39](https://github.com/teleproxy/teleproxy/issues/39) / [#101](https://github.com/teleproxy/teleproxy/issues/101)). When TSPU updates a detection signature, the only operationally interesting traffic is the probe that *fails* secret validation — so the proxy now hashes every well-formed ClientHello (per the [foxio JA4 spec](https://github.com/FoxIO-LLC/ja4)) *before* the HMAC check and rolls it into a top-32 counter. Surfaces as `ja4_seen<TAB><hash><TAB><N>` tab-separated lines in `/stats` and `teleproxy_ja4_seen{hash="..."}` samples in `/metrics`. Always on, no configuration. Optional `[stats] ja4_log = true` TOML key (also `--ja4-log` CLI / `JA4_LOG=true` env) prints `ja4=<hash> sni=<name>` per connection at verbose level 2 for one-off investigations. See the new [ClientHello JA4 Fingerprint Distribution](/features/monitoring/#clienthello-ja4-fingerprint-distribution) section. Downstream goal: the [observatory](https://github.com/teleproxy/observatory) project can now chart fingerprint distribution over time and correlate with block rate instead of relying on user reports.

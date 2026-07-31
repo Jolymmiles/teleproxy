@@ -38,10 +38,11 @@ LABEL org.opencontainers.image.vendor="teleproxy"
 # curl: config downloads + health check
 # openssl: runtime libs (libssl3/libcrypto3) + CLI for secret generation
 # zlib: required by teleproxy (-lz)
+# libatomic: required for portable 16-byte compare-and-swap on ARM64
 # iproute2: ip command for local IP detection in NAT setup
 # ca-certificates: TLS certificate verification
 ARG DEBUG_TOOLS=0
-RUN apk add --no-cache curl ca-certificates openssl zlib iproute2 \
+RUN apk add --no-cache curl ca-certificates openssl zlib libatomic iproute2 \
     $([ "$DEBUG_TOOLS" = "1" ] && echo "libunwind")
 
 # Create user for running the proxy

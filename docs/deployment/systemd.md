@@ -53,6 +53,9 @@ label = "default"
 
 Generate a secret with `teleproxy generate-secret`.
 
+See the [complete TOML configuration reference](toml.md) for every supported
+key, secret limit, fake-TLS backend, ACL, and reload rule.
+
 ## Setup
 
 ```bash

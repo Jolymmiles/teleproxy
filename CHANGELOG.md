@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.16.0] - 2026-07-31
+
+- Fix high idle CPU usage with worker processes (#129). The master now enters
+  the normal epoll sleep path when there are no active special connections
+  instead of waking every 1-2 ms merely because workers are configured.
+- Replace legacy `__sync` compare-and-swap operations with portable
+  `__atomic_compare_exchange_n` calls and link `libatomic` on Linux (#131).
+  This fixes ARM64 builds where 16-byte compare-and-swap is not lock-free.
+- Accept TLS 1.3 camouflage backends that omit the optional compatibility
+  ChangeCipherSpec record (#105). Startup probing and `teleproxy check` now
+  handle both valid ServerHello layouts.
+- Add a complete native TOML configuration reference with defaults, examples,
+  reload behavior, fake-TLS backends, secret limits, ACLs, and DC overrides
+  (#108).
+- Clarify that `/stats` and `/link` deliberately return 404 outside their
+  allowlist, publish Docker's stats port on loopback by default, and document
+  SSH-tunnel access (#127).
+- Correct SOCKS5 documentation and examples: upstream SOCKS5 routing requires
+  direct-to-DC mode (#123).
+
 ## [4.15.0] - 2026-05-30
 
 - Expose ClientHello JA4 fingerprint distribution on `/stats` and `/metrics`

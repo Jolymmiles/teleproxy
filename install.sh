@@ -323,7 +323,9 @@ while IFS= read -r _line; do
     teleproxy link --server "$EXT_IP" --port "$PORT" --secret "$_full" $_label_arg
 done < "$SEC_FILE"
 echo ""
-echo "QR codes also at: http://${EXT_IP}:${STATS_PORT}/link"
+echo "Stats: http://127.0.0.1:${STATS_PORT}/stats"
+echo "QR codes: http://127.0.0.1:${STATS_PORT}/link"
+echo "For remote access, use: ssh -L ${STATS_PORT}:127.0.0.1:${STATS_PORT} <user>@${EXT_IP}"
 echo "============================="
 echo ""
 echo "Manage:"

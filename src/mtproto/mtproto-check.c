@@ -763,8 +763,8 @@ static void check_tls_domain (struct check_context *ctx, int idx) {
     return;
   }
 
-  /* Read full ServerHello + ChangeCipherSpec + first encrypted record */
-  int total_len = 5 + record_len + 6 + 5; /* hdr + SH + CCS(6) + AppData hdr(5) */
+  /* Read full ServerHello plus enough for optional CCS and AppData header */
+  int total_len = 5 + record_len + 6 + 5;
   unsigned char *resp = malloc (total_len + 4096);
   if (!resp) {
     close (fd);
@@ -788,13 +788,18 @@ static void check_tls_domain (struct check_context *ctx, int idx) {
     /* If the record ended exactly here, that's also OK — we'll validate below */
   }
 
-  /* Check for ChangeCipherSpec + first AppData header at end of ServerHello record */
+  /* Locate the first encrypted record after an optional ChangeCipherSpec. */
   int sh_end = 5 + record_len;
-  if (read_pos >= sh_end + 11) {
+  int app_data_header = sh_end;
+  if (read_pos >= sh_end + 6 &&
+      memcmp (resp + sh_end, "\x14\x03\x03\x00\x01\x01", 6) == 0) {
+    app_data_header += 6;
+  }
+  if (read_pos >= app_data_header + 5) {
     /* Read the encrypted application data length to get full response */
-    if (memcmp (resp + sh_end, "\x14\x03\x03\x00\x01\x01\x17\x03\x03", 9) == 0) {
-      int enc_len = (resp[sh_end + 9] << 8) | resp[sh_end + 10];
-      int full_len = sh_end + 11 + enc_len;
+    if (memcmp (resp + app_data_header, "\x17\x03\x03", 3) == 0) {
+      int enc_len = (resp[app_data_header + 3] << 8) | resp[app_data_header + 4];
+      int full_len = app_data_header + 5 + enc_len;
       if (full_len > read_pos) {
         unsigned char *new_resp = realloc (resp, full_len);
         if (new_resp) {

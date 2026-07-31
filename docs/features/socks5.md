@@ -35,6 +35,7 @@ With authentication:
 ### TOML config
 
 ```toml
+direct = true
 socks5 = "socks5://proxy.example.com:1080"
 ```
 
@@ -137,6 +138,7 @@ teleproxy_socks5_connects_failed_total 2
 
 ## Notes
 
-- Works with both direct mode and ME relay mode
+- Requires direct mode. ME relay connections use Telegram's relay targets and
+  cannot be routed through this DC-specific SOCKS5 connector.
 - Not reloadable via SIGHUP — requires a restart to change the SOCKS5 proxy
 - IPv6 target addresses are supported if the SOCKS5 proxy supports them

@@ -71,6 +71,7 @@ Other MTProto proxy implementations describe their TLS layer with adjectives. Te
 docker run -d \
   --name teleproxy \
   -p 443:443 \
+  -p 127.0.0.1:8888:8888 \
   --restart unless-stopped \
   ghcr.io/teleproxy/teleproxy:latest
 ```

@@ -40,7 +40,7 @@ ifeq ($(UNAME_S), Darwin)
 else
   # Linux
   COMMON_CFLAGS += -D_GNU_SOURCE=1
-  COMMON_LDFLAGS := -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread
+  COMMON_LDFLAGS := -ggdb -rdynamic -lm -lrt -lcrypto -lz -lpthread -latomic
 endif
 
 # Auto-detect libunwind for stack traces on musl/Alpine (test/CI builds)
@@ -79,7 +79,7 @@ DEPDIRS := ${DEP} $(addprefix ${DEP}/,${PROJECTS})
 ALLDIRS := ${DEPDIRS} ${OBJDIRS}
 
 
-.PHONY:	all clean lint tests test test-tls test-wildcard-cert test-multi-secret test-secret-limit test-secret-quota test-rate-limit test-top-ips test-ip-acl test-drs-delays test-cdn-dc test-ipv6-direct test-dc-lookup test-config-reload test-secret-drain test-check test-link test-link-ip test-stats-port test-install-config test-proxy-protocol test-dc-probes test-junk test-handshake-timeout test-csv-label test-external-port test-unique-ips test-table-full docker-image-amd64 docker-run-help-amd64 docker-image-arm64 docker-run-help-arm64 fuzz fuzz-run
+.PHONY:	all clean lint tests test test-tls test-tls-parser test-atomic-portability test-idle-cpu test-wildcard-cert test-multi-secret test-secret-limit test-secret-quota test-rate-limit test-top-ips test-ip-acl test-drs-delays test-cdn-dc test-ipv6-direct test-dc-lookup test-config-reload test-secret-drain test-check test-link test-link-ip test-stats-port test-install-config test-proxy-protocol test-dc-probes test-junk test-handshake-timeout test-csv-label test-external-port test-unique-ips test-table-full docker-image-amd64 docker-run-help-amd64 docker-image-arm64 docker-run-help-arm64 fuzz fuzz-run
 
 EXELIST	:= ${EXE}/teleproxy
 
@@ -210,6 +210,23 @@ test-tls:
 		docker compose -f tests/docker-compose.tls-test.yml logs teleproxy; \
 		docker compose -f tests/docker-compose.tls-test.yml down; exit 1)
 	docker compose -f tests/docker-compose.tls-test.yml down
+
+test-tls-parser:
+	$(CC) -std=gnu11 -Wall -Werror -DFUZZ_TARGET -Isrc -I. \
+	  tests/test_tls_server_hello.c src/net/net-tls-parse.c \
+	  -o /tmp/teleproxy-test-tls-server-hello
+	/tmp/teleproxy-test-tls-server-hello
+
+test-atomic-portability:
+	python3 tests/test_atomic_portability.py
+
+test-idle-cpu:
+	@export TELEPROXY_SECRET=$$(head -c 16 /dev/urandom | xxd -ps) && \
+	timeout 120s docker compose -f tests/docker-compose.idle-cpu-test.yml up --build --exit-code-from tester || \
+		(echo "Idle CPU regression test failed"; \
+		docker compose -f tests/docker-compose.idle-cpu-test.yml logs teleproxy; \
+		docker compose -f tests/docker-compose.idle-cpu-test.yml down; exit 1)
+	docker compose -f tests/docker-compose.idle-cpu-test.yml down
 
 test-wildcard-cert:
 	@if [ -z "$$TELEPROXY_SECRET" ]; then \

@@ -119,7 +119,8 @@ static inline void prepare_bs_inv (struct msg_buffers_chunk *C) {
 
 static void lock_chunk_head (struct msg_buffers_chunk *CH) {
   while (1) {
-    if (__sync_bool_compare_and_swap (&CH->magic, MSG_CHUNK_HEAD_MAGIC, MSG_CHUNK_HEAD_LOCKED_MAGIC)) {
+    int expected_magic = MSG_CHUNK_HEAD_MAGIC;
+    if (__atomic_compare_exchange_n (&CH->magic, &expected_magic, MSG_CHUNK_HEAD_LOCKED_MAGIC, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       break;
     }
     usleep (1000);
@@ -131,7 +132,8 @@ static void unlock_chunk_head (struct msg_buffers_chunk *CH) {
 }
 
 static int try_lock_chunk (struct msg_buffers_chunk *C) {
-  if (C->magic != MSG_CHUNK_USED_MAGIC || !__sync_bool_compare_and_swap (&C->magic, MSG_CHUNK_USED_MAGIC, MSG_CHUNK_USED_LOCKED_MAGIC)) {
+  int expected_magic = MSG_CHUNK_USED_MAGIC;
+  if (C->magic != MSG_CHUNK_USED_MAGIC || !__atomic_compare_exchange_n (&C->magic, &expected_magic, MSG_CHUNK_USED_LOCKED_MAGIC, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
     return 0;
   }
   while (1) {
@@ -237,7 +239,8 @@ struct msg_buffers_chunk *alloc_new_msg_buffers_chunk (struct msg_buffers_chunk 
     if (keep_max_allocated_buffer_chunks >= keep_allocated_buffer_chunks) {
       break;
     }
-    __sync_bool_compare_and_swap (&max_allocated_buffer_chunks, keep_max_allocated_buffer_chunks, keep_allocated_buffer_chunks);
+    int expected_max = keep_max_allocated_buffer_chunks;
+    __atomic_compare_exchange_n (&max_allocated_buffer_chunks, &expected_max, keep_allocated_buffer_chunks, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     if (allocated_buffer_chunks >= max_buffer_chunks - 8 && max_buffer_chunks >= 32 && verbosity < 3) { 
       // verbosity = 3; 
       // vkprintf (1, "Setting verbosity to 3 (NOTICE) because of high buffer chunk usage (used %d, max %d)\n", allocated_buffer_chunks, max_buffer_chunks);

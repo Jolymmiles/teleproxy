@@ -17,7 +17,7 @@ RUN make clean && make -j$(nproc) \
 
 FROM alpine:3.21
 
-RUN apk add --no-cache curl ca-certificates openssl zlib iproute2
+RUN apk add --no-cache curl ca-certificates openssl zlib libatomic iproute2
 RUN adduser -D -H -s /sbin/nologin teleproxy
 WORKDIR /opt/teleproxy
 COPY --from=builder /src/objs/bin/teleproxy /opt/teleproxy/

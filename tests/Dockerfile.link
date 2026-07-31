@@ -5,7 +5,7 @@ COPY . .
 RUN make clean && make -j$(nproc)
 
 FROM alpine:3.21
-RUN apk add --no-cache python3 py3-pip py3-pillow zbar
+RUN apk add --no-cache python3 py3-pip py3-pillow zbar libatomic
 RUN pip install --break-system-packages pyzbar
 COPY --from=builder /src/objs/bin/teleproxy /usr/local/bin/teleproxy
 WORKDIR /app

@@ -114,9 +114,10 @@ int tls_check_server_hello (const unsigned char *response, int len,
     FAIL("Receive wrong extensions list");
   }
 
-  CHECK_LENGTH(6);
-  EXPECT_STR(pos, "\x14\x03\x03\x00\x01\x01", "Expected dummy ChangeCipherSpec");
-  pos += 6;
+  if (pos + 6 <= len &&
+      memcmp (response + pos, "\x14\x03\x03\x00\x01\x01", 6) == 0) {
+    pos += 6;
+  }
 
   *encrypted_record_count = 0;
   while (pos + 5 <= len && memcmp (response + pos, "\x17\x03\x03", 3) == 0) {

@@ -38,7 +38,7 @@ theme:
     repo: fontawesome/brands/github
 
 extra:
-  version: "4.13.0"
+  version: "4.16.0"
 
 extra_css:
   - assets/extra.css
@@ -81,6 +81,7 @@ plugins:
             Cloud Deploy: Облачное развёртывание
             Cloudflare Spectrum: Cloudflare Spectrum
             Systemd: Systemd
+            TOML Configuration: Конфигурация TOML
             IPv6: IPv6
             Tuning: Тюнинг
             Testing: Тестирование
@@ -111,6 +112,7 @@ plugins:
             Cloud Deploy: استقرار ابری
             Cloudflare Spectrum: Cloudflare Spectrum
             Systemd: Systemd
+            TOML Configuration: پیکربندی TOML
             IPv6: IPv6
             Tuning: تنظیم عملکرد
             Testing: تست
@@ -141,6 +143,7 @@ plugins:
             Cloud Deploy: Triển khai đám mây
             Cloudflare Spectrum: Cloudflare Spectrum
             Systemd: Systemd
+            TOML Configuration: Cấu hình TOML
             IPv6: IPv6
             Tuning: Tinh chỉnh
             Testing: Kiểm thử
@@ -189,6 +192,7 @@ nav:
     - Diagnostics: features/diagnostics.md
   - Deployment:
     - Systemd: deployment/systemd.md
+    - TOML Configuration: deployment/toml.md
     - IPv6: deployment/ipv6.md
     - Tuning: deployment/tuning.md
     - Cloudflare Spectrum: deployment/cloudflare-spectrum.md

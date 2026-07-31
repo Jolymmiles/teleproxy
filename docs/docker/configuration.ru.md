@@ -42,7 +42,7 @@ services:
     image: ghcr.io/teleproxy/teleproxy:latest
     ports:
       - "443:443"
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     restart: unless-stopped
 ```
 

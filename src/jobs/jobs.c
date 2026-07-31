@@ -606,7 +606,8 @@ int try_lock_job (job_t job, int set_flags, int clear_flags) {
     if (flags & JF_LOCKED) {
       return 0;
     }
-    if (__sync_bool_compare_and_swap (&job->j_flags, flags, (flags & ~clear_flags) | set_flags | JF_LOCKED)) {
+    int expected_flags = flags;
+    if (__atomic_compare_exchange_n (&job->j_flags, &expected_flags, (flags & ~clear_flags) | set_flags | JF_LOCKED, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       job->j_thread = this_job_thread;
       return 1;
     }
@@ -626,7 +627,8 @@ int unlock_job (JOB_REF_ARG (job)) {
     int todo = flags & job->j_status & ((int)0xFF000000u);
     if (!todo) /* {{{ */ {
       int new_flags = flags & ~JF_LOCKED;
-      if (!__sync_bool_compare_and_swap (&job->j_flags, flags, new_flags)) {
+      int expected_flags = flags;
+      if (!__atomic_compare_exchange_n (&job->j_flags, &expected_flags, new_flags, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         continue;
       }
       if (job->j_refcnt >= 2) {
@@ -703,7 +705,8 @@ int unlock_job (JOB_REF_ARG (job)) {
     // have to insert job into queue of req_class
     int queued_flag = JF_QUEUED_CLASS (req_class);
     int new_flags = (flags | queued_flag) & ~JF_LOCKED;
-    if (!__sync_bool_compare_and_swap (&job->j_flags, flags, new_flags)) {
+    int expected_flags = flags;
+    if (!__atomic_compare_exchange_n (&job->j_flags, &expected_flags, new_flags, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       continue;
     }
     if (!(flags & queued_flag)) {
@@ -829,7 +832,8 @@ void complete_subjob (job_t job, JOB_REF_ARG (parent), int status) {
   }
   if (job->j_error && (status & JSP_PARENT_ERROR)) {
     if (!parent->j_error) {
-      __sync_bool_compare_and_swap (&parent->j_error, 0, job->j_error);
+      int expected_error = 0;
+      __atomic_compare_exchange_n (&parent->j_error, &expected_error, job->j_error, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     }
     if (status & JSP_PARENT_WAKEUP) {
       __sync_fetch_and_add (&parent->j_children, -1);
@@ -984,7 +988,8 @@ static void process_one_sublist (unsigned long id, int class) {
  
   __sync_fetch_and_add (&J_SC->allowed_to_run_jobs, 1);
     
-  if (!__sync_bool_compare_and_swap (&J_SC->locked, 0, 1)) {
+  int expected_locked = 0;
+  if (!__atomic_compare_exchange_n (&J_SC->locked, &expected_locked, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
     return;
   }
 
@@ -1010,8 +1015,9 @@ static void process_one_sublist (unsigned long id, int class) {
 
     __sync_synchronize ();
 
-    if (J_SC->processed_jobs < J_SC->allowed_to_run_jobs && 
-        __sync_bool_compare_and_swap (&J_SC->locked, 0, 1)) {
+    int expected_locked = 0;
+    if (J_SC->processed_jobs < J_SC->allowed_to_run_jobs &&
+        __atomic_compare_exchange_n (&J_SC->locked, &expected_locked, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       continue;
     }
     break;

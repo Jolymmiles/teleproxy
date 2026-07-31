@@ -138,7 +138,8 @@ struct msg_part *rwm_lock_last_part (struct raw_message *raw) /* {{{ */ {
     // trying to append bytes to a sub-message of a longer chain, have to fork the chain
     fork_message_chain (raw);
   } else {
-    if (mp->magic != MSG_PART_MAGIC || !__sync_bool_compare_and_swap (&mp->magic, MSG_PART_MAGIC, MSG_PART_LOCKED_MAGIC)) {
+    int expected_magic = MSG_PART_MAGIC;
+    if (mp->magic != MSG_PART_MAGIC || !__atomic_compare_exchange_n (&mp->magic, &expected_magic, MSG_PART_LOCKED_MAGIC, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
       fork_message_chain (raw);
     } else {
       locked = mp;

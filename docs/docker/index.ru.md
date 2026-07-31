@@ -10,7 +10,7 @@ description: "Запуск Teleproxy в Docker одной командой. Ав
 docker run -d \
   --name teleproxy \
   -p 443:443 \
-  -p 8888:8888 \
+  -p 127.0.0.1:8888:8888 \
   --restart unless-stopped \
   ghcr.io/teleproxy/teleproxy:latest
 ```
@@ -76,7 +76,7 @@ docker run -d \
 
 ```bash
 docker build -t teleproxy .
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 teleproxy
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 teleproxy
 docker logs teleproxy 2>&1 | grep "Generated secret"
 ```
 
@@ -87,7 +87,7 @@ docker logs teleproxy 2>&1 | grep "Generated secret"
 ```bash
 docker pull ghcr.io/teleproxy/teleproxy:latest
 docker rm -f teleproxy
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
 ```
 
 С Docker Compose:

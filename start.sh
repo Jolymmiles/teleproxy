@@ -365,7 +365,9 @@ if [ "$_host" = "<YOUR_SERVER_IP>" ]; then
     echo "(Set EXTERNAL_IP to show your server's IP)"
 fi
 echo ""
-echo "QR codes: http://${_host}:${STATS_PORT}/link"
+echo "Stats: http://127.0.0.1:${STATS_PORT}/stats"
+echo "QR codes: http://127.0.0.1:${STATS_PORT}/link"
+echo "(Publish the stats port on host loopback: -p 127.0.0.1:${STATS_PORT}:${STATS_PORT})"
 echo "============================="
 echo ""
 

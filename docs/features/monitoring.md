@@ -12,6 +12,16 @@ curl http://localhost:8888/stats
 
 Requires `--http-stats` flag. Accessible from private networks only (loopback, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
 
+Use the stats port, not the client proxy port. A 404 from a public source
+address is intentional: `/stats`, `/metrics`, and `/link` share the same access
+control. Access them locally, through an SSH tunnel, or add your management
+network with `--stats-allow-net`.
+
+```bash
+ssh -L 8888:127.0.0.1:8888 user@proxy.example.com
+# Then open http://127.0.0.1:8888/link locally.
+```
+
 ### Custom Network Access
 
 To allow access from overlay/VPN networks (Tailscale, WireGuard, Netbird), use `--stats-allow-net`:

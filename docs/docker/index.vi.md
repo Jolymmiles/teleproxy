@@ -10,7 +10,7 @@ Cách đơn giản nhất để chạy Teleproxy - không cần cấu hình gì:
 docker run -d \
   --name teleproxy \
   -p 443:443 \
-  -p 8888:8888 \
+  -p 127.0.0.1:8888:8888 \
   --restart unless-stopped \
   ghcr.io/teleproxy/teleproxy:latest
 ```
@@ -76,7 +76,7 @@ Dùng Docker Hub nếu môi trường của bạn gặp khó khăn khi pull từ
 
 ```bash
 docker build -t teleproxy .
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 teleproxy
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 teleproxy
 docker logs teleproxy 2>&1 | grep "Generated secret"
 ```
 
@@ -87,7 +87,7 @@ Pull image mới nhất và tạo lại container:
 ```bash
 docker pull ghcr.io/teleproxy/teleproxy:latest
 docker rm -f teleproxy
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
 ```
 
 Với Docker Compose:

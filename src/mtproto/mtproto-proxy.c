@@ -1248,9 +1248,6 @@ void precise_cron (void) {
 }
 
 static int mtfront_has_active_connections (void) {
-  if (workers > 0 && !slave_mode) {
-    return 1;
-  }
   return active_special_connections > 0;
 }
 

@@ -934,15 +934,23 @@ static int update_domain_info (struct domain_info *info) {
 
           if (read_pos[i] == response_len[i]) {
             if (!is_encrypted_application_data_length_read[i]) {
-              if (memcmp (responses[i] + response_len[i] - 11, "\x14\x03\x03\x00\x01\x01\x17\x03\x03", 9) != 0) {
+              int app_data_header = response_len[i] - 11;
+              if (memcmp (responses[i] + app_data_header,
+                          "\x14\x03\x03\x00\x01\x01", 6) == 0) {
+                app_data_header += 6;
+              }
+              if (memcmp (responses[i] + app_data_header, "\x17\x03\x03", 3) != 0) {
                 kprintf ("Not found TLS 1.3 support on domain %s\n", domain);
                 have_error = 1;
                 break;
               }
 
               is_encrypted_application_data_length_read[i] = 1;
-              int encrypted_application_data_length = responses[i][response_len[i] - 2] * 256 + responses[i][response_len[i] - 1];
-              response_len[i] += encrypted_application_data_length;
+              int encrypted_application_data_length =
+                responses[i][app_data_header + 3] * 256 +
+                responses[i][app_data_header + 4];
+              response_len[i] = app_data_header + 5 +
+                                encrypted_application_data_length;
               unsigned char *new_buffer = realloc (responses[i], response_len[i]);
               assert (new_buffer != NULL);
               responses[i] = new_buffer;

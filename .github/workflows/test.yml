@@ -80,6 +80,15 @@ jobs:
         fi
         make test-tls
 
+    - name: Run TLS Parser Unit Tests
+      run: make test-tls-parser
+
+    - name: Check Atomic Portability
+      run: make test-atomic-portability
+
+    - name: Run Idle CPU Regression Test
+      run: make test-idle-cpu
+
     - name: Run Wildcard Cert Tests
       env:
         TELEPROXY_SECRET: ${{ secrets.TELEPROXY_SECRET }}

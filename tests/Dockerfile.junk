@@ -15,7 +15,7 @@ RUN make clean && make -j$(nproc) EXTRA_CFLAGS="-DFAULT_ALLOC_LIMIT=${FAULT_ALLO
 
 FROM alpine:3.21
 
-RUN apk add --no-cache curl ca-certificates openssl zlib iproute2 libunwind
+RUN apk add --no-cache curl ca-certificates openssl zlib libatomic iproute2 libunwind
 RUN adduser -D -H -s /sbin/nologin teleproxy
 WORKDIR /opt/teleproxy
 COPY --from=builder /src/objs/bin/teleproxy /opt/teleproxy/

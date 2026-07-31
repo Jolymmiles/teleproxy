@@ -6,11 +6,21 @@ description: "Set up Prometheus and Grafana monitoring for Teleproxy Docker depl
 
 ## HTTP Stats
 
+Publish the stats port on host loopback:
+
+```bash
+-p 127.0.0.1:8888:8888
+```
+
+Then query it on the Docker host:
+
 ```bash
 curl http://localhost:8888/stats
 ```
 
 Returns a human-readable summary of active connections, traffic counters, and uptime.
+The endpoints are on the stats port, not port 443. Public requests outside the
+configured allowlist return 404 intentionally.
 
 ## Prometheus Metrics
 

@@ -514,7 +514,8 @@ int do_connection_job (job_t job, int op, struct job_thread *JT) /* {{{ */ {
           __sync_fetch_and_add (&CONN_TARGET_INFO(c->target)->active_outbound_connections, 1);
         }
         if (c->status == conn_connecting) {
-          if (!__sync_bool_compare_and_swap (&c->status, conn_connecting, conn_working)) {
+          int expected_status = conn_connecting;
+          if (!__atomic_compare_exchange_n (&c->status, &expected_status, conn_working, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
             assert (c->status == conn_error);
           }
         }

@@ -10,7 +10,7 @@ The simplest way to run Teleproxy — no configuration needed:
 docker run -d \
   --name teleproxy \
   -p 443:443 \
-  -p 8888:8888 \
+  -p 127.0.0.1:8888:8888 \
   --restart unless-stopped \
   ghcr.io/teleproxy/teleproxy:latest
 ```
@@ -76,7 +76,7 @@ Use Docker Hub if your environment has trouble pulling from ghcr.io (e.g. MikroT
 
 ```bash
 docker build -t teleproxy .
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 teleproxy
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 teleproxy
 docker logs teleproxy 2>&1 | grep "Generated secret"
 ```
 
@@ -87,7 +87,7 @@ Pull the latest image and recreate the container:
 ```bash
 docker pull ghcr.io/teleproxy/teleproxy:latest
 docker rm -f teleproxy
-docker run -d --name teleproxy -p 443:443 -p 8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
+docker run -d --name teleproxy -p 443:443 -p 127.0.0.1:8888:8888 --restart unless-stopped ghcr.io/teleproxy/teleproxy:latest
 ```
 
 With Docker Compose:
