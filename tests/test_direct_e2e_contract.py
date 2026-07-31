@@ -52,6 +52,7 @@ env = {
 with (
     patch.dict(os.environ, env, clear=True),
     patch.object(module, "_patch_mtproxy_test_dc"),
+    patch.object(module, "_unpatch_mtproxy_test_dc") as unpatch_test_dc,
     patch.object(module, "test_obfs2_all", fake_obfs2),
     patch.object(module, "test_faketls_all", fake_faketls),
     patch.object(module, "_check_drs_delay_stats", return_value=True),
@@ -62,6 +63,7 @@ with (
     except SystemExit as exc:
         assert exc.code == 0, f"bot fallback exited with {exc.code}"
 
+unpatch_test_dc.assert_called_once_with()
 assert auth_attempts == [
     ("", "stale-test-session"),
     ("fallback-bot-token", ""),

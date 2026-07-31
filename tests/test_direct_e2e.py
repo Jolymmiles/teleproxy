@@ -93,6 +93,9 @@ class SessionUnauthorized(Exception):
     """The preferred user session no longer belongs to an authorized user."""
 
 
+_MT_PROXY_ORIGINAL_INIT_HEADER = None
+
+
 def _patch_mtproxy_test_dc():
     """Patch MTProxy header to add 10000 to dc_id.
 
@@ -101,15 +104,34 @@ def _patch_mtproxy_test_dc():
     This patch transparently adds the offset so the proxy routes to the
     correct test DC without modifying the session itself.
     """
+    global _MT_PROXY_ORIGINAL_INIT_HEADER
+
     from telethon.network.connection.tcpmtproxy import MTProxyIO
 
-    _orig = MTProxyIO.init_header
+    if _MT_PROXY_ORIGINAL_INIT_HEADER is not None:
+        return
+    _MT_PROXY_ORIGINAL_INIT_HEADER = MTProxyIO.init_header
 
     @staticmethod
     def _patched(secret, dc_id, packet_codec):
-        return _orig(secret, dc_id + 10000, packet_codec)
+        return _MT_PROXY_ORIGINAL_INIT_HEADER(
+            secret, dc_id + 10000, packet_codec
+        )
 
     MTProxyIO.init_header = _patched
+
+
+def _unpatch_mtproxy_test_dc():
+    """Restore production DC routing after a test-session fallback."""
+    global _MT_PROXY_ORIGINAL_INIT_HEADER
+
+    if _MT_PROXY_ORIGINAL_INIT_HEADER is None:
+        return
+
+    from telethon.network.connection.tcpmtproxy import MTProxyIO
+
+    MTProxyIO.init_header = staticmethod(_MT_PROXY_ORIGINAL_INIT_HEADER)
+    _MT_PROXY_ORIGINAL_INIT_HEADER = None
 
 
 def _patch_telethon_faketls():
@@ -756,6 +778,7 @@ def main():
             sys.exit(1)
         print("[obfs2] Test DC session is no longer authorized; "
               "retrying with bot fallback")
+        _unpatch_mtproxy_test_dc()
         mode = "bot fallback"
         session_str = ""
         bot_token = fallback_bot_token
