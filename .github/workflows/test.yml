@@ -89,6 +89,9 @@ jobs:
     - name: Run Idle CPU Regression Test
       run: make test-idle-cpu
 
+    - name: Check Direct E2E Contracts
+      run: make test-direct-e2e-contract
+
     - name: Run Wildcard Cert Tests
       env:
         TELEPROXY_SECRET: ${{ secrets.TELEPROXY_SECRET }}

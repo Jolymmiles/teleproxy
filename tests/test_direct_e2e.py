@@ -89,6 +89,10 @@ PROD_MIN_THROUGHPUT_MBPS = float(os.environ.get("MIN_THROUGHPUT_MBPS", "0.5"))
 TEST_DC_MIN_THROUGHPUT_MBPS = float(os.environ.get("MIN_THROUGHPUT_MBPS", "0.1"))
 
 
+class SessionUnauthorized(Exception):
+    """The preferred user session no longer belongs to an authorized user."""
+
+
 def _patch_mtproxy_test_dc():
     """Patch MTProxy header to add 10000 to dc_id.
 
@@ -474,6 +478,8 @@ async def _connect_and_auth(client, label, bot_token=None):
                 print(f"[{label}] FAIL: client did not connect")
                 return None
             me = await asyncio.wait_for(client.get_me(), timeout=15)
+            if me is None:
+                raise SessionUnauthorized
             return me
         except AuthKeyDuplicatedError:
             if attempt < max_retries:
@@ -517,7 +523,7 @@ async def test_obfs2_all(host, port, secret, bot_token="", session_str="",
                                      bot_token=bot_token or None)
         if me is None:
             print("[obfs2] FAIL: get_me() returned None")
-            return False, {}
+            return False, {}, 0.0
 
         print(f"[obfs2] get_me OK: id={me.id}")
 
@@ -529,6 +535,8 @@ async def test_obfs2_all(host, port, secret, bot_token="", session_str="",
             small_ok, small_time = True, 0.0
         has_failure = any(v is None for v in throughputs.values())
         return not has_failure and small_ok, throughputs, small_time
+    except SessionUnauthorized:
+        raise
     except Exception as e:
         print(f"[obfs2] FAIL: {type(e).__name__}: {e}")
         return False, {}, 0.0
@@ -687,6 +695,7 @@ async def test_rate_limit(host, port, stats_port, secret,
 def main():
     test_session = os.environ.get("TG_TEST_SESSION", "")
     bot_token = os.environ.get("TG_BOT_TOKEN", "")
+    fallback_bot_token = bot_token
     session_str = os.environ.get("TG_STRING_SESSION", "")
 
     if not test_session and not bot_token and not session_str:
@@ -735,11 +744,32 @@ def main():
     print(f"=== Direct Mode E2E Tests ({mode}) ===\n")
 
     # Test 1: obfuscated2 (control — no DRS delays)
-    obfs2_ok, obfs2_tp, obfs2_small_time = asyncio.run(
-        test_obfs2_all(host, obfs2_port, secret,
-                       bot_token=bot_token, session_str=session_str,
-                       test_files=test_files)
-    )
+    try:
+        obfs2_ok, obfs2_tp, obfs2_small_time = asyncio.run(
+            test_obfs2_all(host, obfs2_port, secret,
+                           bot_token=bot_token, session_str=session_str,
+                           test_files=test_files)
+        )
+    except SessionUnauthorized:
+        if not fallback_bot_token:
+            print("[obfs2] FAIL: test DC session is no longer authorized")
+            sys.exit(1)
+        print("[obfs2] Test DC session is no longer authorized; "
+              "retrying with bot fallback")
+        mode = "bot fallback"
+        session_str = ""
+        bot_token = fallback_bot_token
+        test_files = PROD_TEST_FILES
+        channel_id = PROD_CHANNEL_ID
+        min_tp = PROD_MIN_THROUGHPUT_MBPS
+        TEST_FILES = test_files
+        TEST_CHANNEL_ID = channel_id
+        MIN_THROUGHPUT_MBPS = min_tp
+        obfs2_ok, obfs2_tp, obfs2_small_time = asyncio.run(
+            test_obfs2_all(host, obfs2_port, secret,
+                           bot_token=bot_token, session_str=session_str,
+                           test_files=test_files)
+        )
     print()
 
     # Test 2: fake-TLS (exercises DRS delays)

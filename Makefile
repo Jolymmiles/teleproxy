@@ -79,7 +79,7 @@ DEPDIRS := ${DEP} $(addprefix ${DEP}/,${PROJECTS})
 ALLDIRS := ${DEPDIRS} ${OBJDIRS}
 
 
-.PHONY:	all clean lint tests test test-tls test-tls-parser test-atomic-portability test-idle-cpu test-wildcard-cert test-multi-secret test-secret-limit test-secret-quota test-rate-limit test-top-ips test-ip-acl test-drs-delays test-cdn-dc test-ipv6-direct test-dc-lookup test-config-reload test-secret-drain test-check test-link test-link-ip test-stats-port test-install-config test-proxy-protocol test-dc-probes test-junk test-handshake-timeout test-csv-label test-external-port test-unique-ips test-table-full docker-image-amd64 docker-run-help-amd64 docker-image-arm64 docker-run-help-arm64 fuzz fuzz-run
+.PHONY:	all clean lint tests test test-tls test-tls-parser test-atomic-portability test-idle-cpu test-direct-e2e-contract test-wildcard-cert test-multi-secret test-secret-limit test-secret-quota test-rate-limit test-top-ips test-ip-acl test-drs-delays test-cdn-dc test-ipv6-direct test-dc-lookup test-config-reload test-secret-drain test-check test-link test-link-ip test-stats-port test-install-config test-proxy-protocol test-dc-probes test-junk test-handshake-timeout test-csv-label test-external-port test-unique-ips test-table-full docker-image-amd64 docker-run-help-amd64 docker-image-arm64 docker-run-help-arm64 fuzz fuzz-run
 
 EXELIST	:= ${EXE}/teleproxy
 
@@ -227,6 +227,9 @@ test-idle-cpu:
 		docker compose -f tests/docker-compose.idle-cpu-test.yml logs teleproxy; \
 		docker compose -f tests/docker-compose.idle-cpu-test.yml down; exit 1)
 	docker compose -f tests/docker-compose.idle-cpu-test.yml down
+
+test-direct-e2e-contract:
+	python3 tests/test_direct_e2e_contract.py
 
 test-wildcard-cert:
 	@if [ -z "$$TELEPROXY_SECRET" ]; then \
