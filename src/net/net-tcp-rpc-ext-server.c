@@ -420,6 +420,7 @@ void tcp_rpcs_ip_track_clear_slot (int secret_id) {
   if (secret_id < 0 || secret_id >= EXT_SECRET_MAX_SLOTS) { return; }
   memset (per_secret_ips[secret_id], 0, sizeof (per_secret_ips[secret_id]));
   uniq_bloom_clear_slot (secret_id);
+  ja4_clear_secret (secret_id);
   per_secret_unique_ip_count[secret_id] = 0;
 }
 
@@ -1537,7 +1538,8 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
         }
 
         vkprintf (1, "TLS type with domain %s from %s:%d\n", info->domain, show_remote_ip (C), c->remote_port);
-        ja4_observe (client_hello, read_len);
+        char ja4_hash[JA4_HASH_BUF];
+        int have_ja4 = ja4_observe_with_hash (client_hello, read_len, ja4_hash) == 0;
 
         if (c->our_port == 80) {
           vkprintf (1, "Receive TLS request on port %d, proxying to %s\n", c->our_port, info->domain);
@@ -1577,6 +1579,7 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
           vkprintf (1, "Receive request with unmatched client random\n");
           RETURN_TLS_ERROR(info);
         }
+        if (have_ja4) { ja4_observe_secret (secret_id, ja4_hash); }
         int timestamp = *(int *)(expected_random + 28) ^ *(int *)(client_random + 28);
         if (!is_allowed_timestamp (timestamp)) {
           RETURN_TLS_ERROR(info);

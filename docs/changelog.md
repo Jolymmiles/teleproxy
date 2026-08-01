@@ -4,6 +4,16 @@ description: "Release history for Teleproxy. Version details, new features, bug 
 
 # Changelog
 
+## 4.16.1
+
+- **Per-secret JA4 distributions.** Each worker now keeps the top four
+  HMAC-matched ClientHello fingerprints for every configured secret. They are
+  exposed as `secret_<label>_ja4_seen<TAB><hash><TAB><N>` in `/stats` and
+  `teleproxy_secret_ja4_seen{secret="...",hash="..."}` in `/metrics`. The
+  existing global top-32 counter still includes unmatched probes, while the
+  per-secret view shows which distributed secret each recognized fingerprint
+  used.
+
 ## 4.16.0
 
 - **Fix high idle CPU usage with worker processes** ([#129](https://github.com/teleproxy/teleproxy/issues/129)). The master now enters the normal epoll sleep path when there are no active special connections instead of waking every 1-2 ms merely because workers are configured.

@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.16.1] - 2026-08-01
+
+- Add bounded per-secret JA4 distributions alongside the global ClientHello
+  counter. Each worker keeps the top four HMAC-matched fingerprints per secret
+  and exposes them as `secret_<label>_ja4_seen<TAB><hash><TAB><N>` in `/stats`
+  and `teleproxy_secret_ja4_seen{secret="...",hash="..."}` in `/metrics`.
+  Unmatched ClientHellos remain visible in the existing global top-32 counter.
+
 ## [4.16.0] - 2026-07-31
 
 - Fix high idle CPU usage with worker processes (#129). The master now enters

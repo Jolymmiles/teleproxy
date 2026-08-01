@@ -52,7 +52,15 @@ Every well-formed TLS ClientHello reaching the proxy is fingerprinted with [JA4]
 teleproxy_ja4_seen{hash="t13d1615h2_46e7e9700bed_45f260be83e2"} 8
 ```
 
-The `/stats` endpoint emits the same data as tab-separated `ja4_seen\t<hash>\t<count>` lines. Diff the distribution against your user count or upstream session log to spot the probe — a fingerprint that shows up only when block rate spikes is the new signature.
+ClientHellos whose HMAC matches a configured secret also feed a bounded top-four distribution for that secret:
+
+```
+# HELP teleproxy_secret_ja4_seen ClientHello JA4 fingerprints observed per secret (top 4 by count, aggregated across workers).
+# TYPE teleproxy_secret_ja4_seen counter
+teleproxy_secret_ja4_seen{secret="family",hash="t13d1615h2_46e7e9700bed_45f260be83e2"} 6
+```
+
+The `/stats` endpoint emits the same data as tab-separated `ja4_seen\t<hash>\t<count>` and `secret_<label>_ja4_seen\t<hash>\t<count>` lines. Unmatched ClientHellos appear only in the global counter. Diff the global distribution against the per-secret view or upstream session log to separate unrecognized probes from fingerprints using a distributed secret.
 
 Optional: `--ja4-log` (or `[stats] ja4_log = true` in TOML, `JA4_LOG=true` in Docker) prints one `ja4=... sni=...` line per connection at verbose level 2. Useful for one-off investigations, noisy for steady-state logging.
 

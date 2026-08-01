@@ -35,15 +35,19 @@ def _generate_greases():
     return greases
 
 
-def build_client_hello(domain):
+def build_client_hello(domain, first_alpn="h2"):
     """Build a 517-byte TLS ClientHello matching Teleproxy's create_request().
 
     Args:
         domain: SNI hostname to include in the ClientHello.
+        first_alpn: Two-character first ALPN protocol.
 
     Returns:
         bytearray of exactly 517 bytes.
     """
+    if len(first_alpn) != 2:
+        raise ValueError("first_alpn must be exactly two characters")
+
     buf = bytearray(TLS_REQUEST_LENGTH)
     pos = 0
     greases = _generate_greases()
@@ -125,10 +129,10 @@ def build_client_hello(domain):
     # session_ticket (type=0x0023, empty)
     add(b"\x00\x23\x00\x00")
 
-    # ALPN (type=0x0010): h2 + http/1.1
-    add(
-        b"\x00\x10\x00\x0e\x00\x0c\x02\x68\x32\x08\x68\x74\x74\x70\x2f\x31\x2e\x31"
-    )
+    # ALPN (type=0x0010): configurable two-byte protocol + http/1.1
+    add(b"\x00\x10\x00\x0e\x00\x0c\x02")
+    add(first_alpn.encode("ascii"))
+    add(b"\x08\x68\x74\x74\x70\x2f\x31\x2e\x31")
 
     # status_request (type=0x0005)
     add(b"\x00\x05\x00\x05\x01\x00\x00\x00\x00")
@@ -296,7 +300,9 @@ def parse_tls_server_hello(data):
 # ============================================================
 
 
-def _do_handshake(host, port, secret_bytes, domain=None, timestamp_offset=0):
+def _do_handshake(
+    host, port, secret_bytes, domain=None, timestamp_offset=0, first_alpn="h2"
+):
     """Build and send a fake-TLS ClientHello, return raw response + client_random.
 
     The SNI domain MUST match the proxy's -D/EE_DOMAIN setting for the proxy
@@ -311,6 +317,7 @@ def _do_handshake(host, port, secret_bytes, domain=None, timestamp_offset=0):
         domain: SNI domain for the ClientHello. Defaults to EE_DOMAIN env var.
         timestamp_offset: Seconds to add to current time for the embedded timestamp.
             Use negative values for timestamps in the past.
+        first_alpn: Two-character first ALPN protocol used to vary JA4.
 
     Returns:
         Tuple of (response_data, client_random) where response_data is the raw
@@ -324,7 +331,7 @@ def _do_handshake(host, port, secret_bytes, domain=None, timestamp_offset=0):
         domain = os.environ.get(
             "EE_DOMAIN", os.environ.get("TLS_BACKEND_HOST", "172.30.0.10")
         )
-    hello = build_client_hello(domain)
+    hello = build_client_hello(domain, first_alpn=first_alpn)
 
     hello_zeroed = bytearray(hello)
     hello_zeroed[11:43] = b"\x00" * 32

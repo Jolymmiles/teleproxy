@@ -210,6 +210,9 @@ static void update_local_stats_copy (struct worker_stats *S) {
     UPD (per_secret_rejected_draining[_i]);
     UPD (per_secret_drain_forced[_i]);
     tcp_rpcs_snapshot_top_ips (_i, S->top_ips[_i], &S->top_ips_count[_i], WORKER_TOP_IPS_MAX);
+    ja4_secret_snapshot (_i, S->top_ja4_by_secret[_i],
+                         &S->top_ja4_by_secret_count[_i],
+                         WORKER_TOP_JA4_PER_SECRET_MAX);
   }}
   ja4_snapshot (S->top_ja4, &S->top_ja4_count, WORKER_TOP_JA4_MAX);
 #undef UPD
@@ -354,6 +357,10 @@ void compute_stats_sum (void) {
     add_stats (&W);
     merge_worker_top_ips (&W);
     ja4_master_merge (W.top_ja4, W.top_ja4_count);
+    for (int secret_id = 0; secret_id < EXT_SECRET_MAX_SLOTS; secret_id++) {
+      ja4_master_merge_secret (secret_id, W.top_ja4_by_secret[secret_id],
+                               W.top_ja4_by_secret_count[secret_id]);
+    }
   }
 }
 
@@ -383,6 +390,44 @@ static int top_ip_cmp_desc (const void *a, const void *b) {
   if (tx > ty) { return -1; }
   if (tx < ty) { return  1; }
   return 0;
+}
+
+static void dump_secret_ja4_stats (stats_buffer_t *sb) {
+  struct worker_top_ja4 rows[WORKER_TOP_JA4_PER_SECRET_MAX];
+  int secret_count = tcp_rpcs_get_ext_secret_count ();
+  for (int secret_id = 0; secret_id < secret_count; secret_id++) {
+    if (tcp_rpcs_get_ext_secret_state (secret_id) == SLOT_FREE) { continue; }
+    int n = ja4_master_secret_snapshot (
+      secret_id, rows, WORKER_TOP_JA4_PER_SECRET_MAX);
+    for (int i = 0; i < n; i++) {
+      sb_printf (sb, "secret_%s_ja4_seen\t%s\t%llu\n",
+                 tcp_rpcs_get_ext_secret_label (secret_id), rows[i].hash,
+                 (unsigned long long) rows[i].count);
+    }
+  }
+}
+
+static void dump_secret_ja4_prometheus (stats_buffer_t *sb) {
+  struct worker_top_ja4 rows[WORKER_TOP_JA4_PER_SECRET_MAX];
+  int secret_count = tcp_rpcs_get_ext_secret_count ();
+  int wrote_help = 0;
+  for (int secret_id = 0; secret_id < secret_count; secret_id++) {
+    if (tcp_rpcs_get_ext_secret_state (secret_id) == SLOT_FREE) { continue; }
+    int n = ja4_master_secret_snapshot (
+      secret_id, rows, WORKER_TOP_JA4_PER_SECRET_MAX);
+    if (n > 0 && !wrote_help) {
+      sb_printf (sb,
+                 "# HELP teleproxy_secret_ja4_seen ClientHello JA4 fingerprints observed per secret (top 4 by count, aggregated across workers).\n"
+                 "# TYPE teleproxy_secret_ja4_seen counter\n");
+      wrote_help = 1;
+    }
+    for (int i = 0; i < n; i++) {
+      sb_printf (sb,
+                 "teleproxy_secret_ja4_seen{secret=\"%s\",hash=\"%s\"} %llu\n",
+                 tcp_rpcs_get_ext_secret_label (secret_id), rows[i].hash,
+                 (unsigned long long) rows[i].count);
+    }
+  }
 }
 
 /*
@@ -634,6 +679,7 @@ void mtfront_prepare_stats (stats_buffer_t *sb) {
   }
   dc_probes_write_text_stats (sb);
   ja4_dump_stats (sb);
+  dump_secret_ja4_stats (sb);
 #undef S
 #undef S1
 #undef SW
@@ -1074,6 +1120,7 @@ void mtfront_prepare_prometheus_stats (stats_buffer_t *sb) {
 
   dc_probes_write_prometheus (sb);
   ja4_dump_prometheus (sb);
+  dump_secret_ja4_prometheus (sb);
 
 #undef S
 #undef S1

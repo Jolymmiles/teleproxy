@@ -42,7 +42,15 @@ curl http://localhost:8888/metrics
 teleproxy_ja4_seen{hash="t13d1615h2_46e7e9700bed_45f260be83e2"} 8
 ```
 
-В `/stats` те же данные приходят как tab-разделённые строки `ja4_seen\t<hash>\t<count>`. Сверьте распределение со счётчиком пользователей или логами апстрима — фингерпринт, который появляется только когда растёт rate блокировок, и есть новая сигнатура.
+ClientHello, HMAC которых совпал с настроенным секретом, также попадают в ограниченный топ-4 счётчик этого секрета:
+
+```
+# HELP teleproxy_secret_ja4_seen ClientHello JA4 fingerprints observed per secret (top 4 by count, aggregated across workers).
+# TYPE teleproxy_secret_ja4_seen counter
+teleproxy_secret_ja4_seen{secret="family",hash="t13d1615h2_46e7e9700bed_45f260be83e2"} 6
+```
+
+В `/stats` те же данные приходят как tab-разделённые строки `ja4_seen\t<hash>\t<count>` и `secret_<label>_ja4_seen\t<hash>\t<count>`. ClientHello без совпавшего секрета остаются только в глобальном счётчике. Сравнение глобального распределения с посекретным отделяет неизвестные зонды от фингерпринтов, использующих выданный секрет.
 
 Опционально: `--ja4-log` (или `[stats] ja4_log = true` в TOML, `JA4_LOG=true` в Docker) печатает строку `ja4=... sni=...` на каждое подключение при verbose 2. Полезно для разовых разборов, шумно в обычном режиме.
 

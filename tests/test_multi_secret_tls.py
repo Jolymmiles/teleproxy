@@ -6,10 +6,14 @@ multiple configured secrets, and still rejects unknown secrets.
 """
 import os
 import sys
+import time
+import urllib.request
 
+from test_tls_ja4 import compute_ja4
 from test_tls_e2e import (
     _do_handshake,
     _verify_server_hmac,
+    build_client_hello,
     wait_for_proxy,
 )
 
@@ -26,7 +30,10 @@ def test_multi_secret_handshake():
 
     for i, secret_hex in enumerate(secrets):
         secret_bytes = bytes.fromhex(secret_hex)
-        data, client_random = _do_handshake(host, port, secret_bytes)
+        first_alpn = "h2" if i == 0 else "h3"
+        data, client_random = _do_handshake(
+            host, port, secret_bytes, first_alpn=first_alpn
+        )
 
         assert len(data) >= 138, (
             f"Secret #{i+1} ({secret_hex[:8]}...): Response too short "
@@ -36,6 +43,38 @@ def test_multi_secret_handshake():
             f"Secret #{i+1} ({secret_hex[:8]}...): HMAC mismatch"
         )
         print(f"  Secret #{i+1} ({secret_hex[:8]}...): handshake OK")
+
+
+def test_per_secret_ja4_buckets():
+    """Verify distinct ClientHellos stay in their matching secret buckets."""
+    host = os.environ.get("TELEPROXY_HOST", "teleproxy")
+    stats_port = os.environ.get("TELEPROXY_STATS_PORT", "8888")
+    domain = os.environ.get("EE_DOMAIN", "172.30.0.10")
+    expected = {
+        "alpha": compute_ja4(build_client_hello(domain, first_alpn="h2")),
+        "beta": compute_ja4(build_client_hello(domain, first_alpn="h3")),
+    }
+
+    time.sleep(0.5)
+    stats = urllib.request.urlopen(
+        f"http://{host}:{stats_port}/stats", timeout=5
+    ).read().decode()
+    metrics = urllib.request.urlopen(
+        f"http://{host}:{stats_port}/metrics", timeout=5
+    ).read().decode()
+
+    for label, ja4_hash in expected.items():
+        stats_line = f"secret_{label}_ja4_seen\t{ja4_hash}\t"
+        metric = f'teleproxy_secret_ja4_seen{{secret="{label}",hash="{ja4_hash}"}}'
+        assert stats_line in stats, f"missing {stats_line!r} in /stats"
+        assert metric in metrics, f"missing {metric!r} in /metrics"
+
+    assert (
+        f'secret="alpha",hash="{expected["beta"]}"' not in metrics
+    ), "beta JA4 leaked into alpha bucket"
+    assert (
+        f'secret="beta",hash="{expected["alpha"]}"' not in metrics
+    ), "alpha JA4 leaked into beta bucket"
 
 
 def test_wrong_secret_still_rejected():
@@ -61,6 +100,7 @@ def test_wrong_secret_still_rejected():
 def main():
     tests = [
         ("test_multi_secret_handshake", test_multi_secret_handshake),
+        ("test_per_secret_ja4_buckets", test_per_secret_ja4_buckets),
         ("test_wrong_secret_still_rejected", test_wrong_secret_still_rejected),
     ]
 

@@ -20,6 +20,9 @@
 
 #define MAX_WORKERS	256
 
+_Static_assert (JA4_SECRET_SLOTS_MAX == EXT_SECRET_MAX_SLOTS,
+                "JA4 and secret slot capacities must match");
+
 struct worker_stats {
   int cnt;
   int updated_at;
@@ -88,6 +91,9 @@ struct worker_stats {
      workers before rendering /stats and /metrics. */
   struct worker_top_ja4 top_ja4[WORKER_TOP_JA4_MAX];
   int top_ja4_count;
+  struct worker_top_ja4
+    top_ja4_by_secret[EXT_SECRET_MAX_SLOTS][WORKER_TOP_JA4_PER_SECRET_MAX];
+  int top_ja4_by_secret_count[EXT_SECRET_MAX_SLOTS];
 };
 
 extern struct worker_stats *WStats, SumStats;

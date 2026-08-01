@@ -352,23 +352,26 @@ int ja4_compute (const unsigned char *ch, int len, char out[JA4_HASH_BUF]) {
 /* -------- Worker-local top-N table -------- */
 
 static struct worker_top_ja4 ja4_table[WORKER_TOP_JA4_MAX];
+static struct worker_top_ja4
+  secret_ja4_table[JA4_SECRET_SLOTS_MAX][WORKER_TOP_JA4_PER_SECRET_MAX];
 
-static void ja4_record (const char *hash) {
+static void ja4_record (struct worker_top_ja4 *table, int max,
+                        const char *hash) {
   /* Per-worker single-threaded — no locking needed within the hot path.
      Race tolerance for cross-process snapshots is handled by the
      __sync_synchronize() barriers in mtproto-proxy-stats.c. */
-  for (int i = 0; i < WORKER_TOP_JA4_MAX; i++) {
-    if (ja4_table[i].count == 0) { continue; }
-    if (strcmp (ja4_table[i].hash, hash) == 0) {
-      ja4_table[i].count++;
+  for (int i = 0; i < max; i++) {
+    if (table[i].count == 0) { continue; }
+    if (strcmp (table[i].hash, hash) == 0) {
+      table[i].count++;
       return;
     }
   }
   /* Not found — claim an empty slot. */
-  for (int i = 0; i < WORKER_TOP_JA4_MAX; i++) {
-    if (ja4_table[i].count == 0) {
-      snprintf (ja4_table[i].hash, JA4_HASH_BUF, "%s", hash);
-      ja4_table[i].count = 1;
+  for (int i = 0; i < max; i++) {
+    if (table[i].count == 0) {
+      snprintf (table[i].hash, JA4_HASH_BUF, "%s", hash);
+      table[i].count = 1;
       return;
     }
   }
@@ -376,21 +379,42 @@ static void ja4_record (const char *hash) {
      would benefit observability (count == 1 always loses, so drop). */
 }
 
-void ja4_observe (const unsigned char *client_hello, int len) {
-  char hash[JA4_HASH_BUF];
-  if (ja4_compute (client_hello, len, hash) < 0) {
-    return;
+int ja4_observe_with_hash (const unsigned char *client_hello, int len,
+                           char out[JA4_HASH_BUF]) {
+  if (ja4_compute (client_hello, len, out) < 0) {
+    out[0] = '\0';
+    return -1;
   }
-  ja4_record (hash);
+  ja4_record (ja4_table, WORKER_TOP_JA4_MAX, out);
   if (toml_cfg.ja4_log) {
     char sni[256] = "";
     int sni_len = tls_parse_sni (client_hello, len, sni, sizeof (sni));
     if (sni_len > 0) {
-      vkprintf (2, "ja4=%s sni=%s\n", hash, sni);
+      vkprintf (2, "ja4=%s sni=%s\n", out, sni);
     } else {
-      vkprintf (2, "ja4=%s sni=-\n", hash);
+      vkprintf (2, "ja4=%s sni=-\n", out);
     }
   }
+  return 0;
+}
+
+void ja4_observe (const unsigned char *client_hello, int len) {
+  char hash[JA4_HASH_BUF];
+  ja4_observe_with_hash (client_hello, len, hash);
+}
+
+void ja4_observe_secret (int secret_id, const char hash[JA4_HASH_BUF]) {
+  if (secret_id < 0 || secret_id >= JA4_SECRET_SLOTS_MAX || hash[0] == '\0') {
+    return;
+  }
+  ja4_record (secret_ja4_table[secret_id],
+              WORKER_TOP_JA4_PER_SECRET_MAX, hash);
+}
+
+void ja4_clear_secret (int secret_id) {
+  if (secret_id < 0 || secret_id >= JA4_SECRET_SLOTS_MAX) { return; }
+  memset (secret_ja4_table[secret_id], 0,
+          sizeof (secret_ja4_table[secret_id]));
 }
 
 void ja4_snapshot (struct worker_top_ja4 *out, int *count_out, int max) {
@@ -403,16 +427,35 @@ void ja4_snapshot (struct worker_top_ja4 *out, int *count_out, int max) {
   *count_out = n;
 }
 
+void ja4_secret_snapshot (int secret_id, struct worker_top_ja4 *out,
+                          int *count_out, int max) {
+  int n = 0;
+  if (secret_id >= 0 && secret_id < JA4_SECRET_SLOTS_MAX) {
+    for (int i = 0; i < WORKER_TOP_JA4_PER_SECRET_MAX && n < max; i++) {
+      if (secret_ja4_table[secret_id][i].count == 0) { continue; }
+      memcpy (&out[n], &secret_ja4_table[secret_id][i],
+              sizeof (struct worker_top_ja4));
+      n++;
+    }
+  }
+  *count_out = n;
+}
+
 /* -------- Master-side aggregation -------- */
 
 #define MASTER_TOP_JA4_MAX  256
 
 static struct worker_top_ja4 master_table[MASTER_TOP_JA4_MAX];
 static int master_count;
+static struct worker_top_ja4
+  master_secret_table[JA4_SECRET_SLOTS_MAX][MASTER_TOP_JA4_MAX];
+static int master_secret_count[JA4_SECRET_SLOTS_MAX];
 
 void ja4_master_reset (void) {
   master_count = 0;
   memset (master_table, 0, sizeof (master_table));
+  memset (master_secret_count, 0, sizeof (master_secret_count));
+  memset (master_secret_table, 0, sizeof (master_secret_table));
 }
 
 void ja4_master_prepare_local (void) {
@@ -421,6 +464,13 @@ void ja4_master_prepare_local (void) {
   int count = 0;
   ja4_snapshot (buf, &count, WORKER_TOP_JA4_MAX);
   ja4_master_merge (buf, count);
+  for (int secret_id = 0; secret_id < JA4_SECRET_SLOTS_MAX; secret_id++) {
+    struct worker_top_ja4 secret_buf[WORKER_TOP_JA4_PER_SECRET_MAX];
+    int secret_count = 0;
+    ja4_secret_snapshot (secret_id, secret_buf, &secret_count,
+                         WORKER_TOP_JA4_PER_SECRET_MAX);
+    ja4_master_merge_secret (secret_id, secret_buf, secret_count);
+  }
 }
 
 void ja4_master_merge (const struct worker_top_ja4 *slots, int count) {
@@ -441,6 +491,28 @@ void ja4_master_merge (const struct worker_top_ja4 *slots, int count) {
   }
 }
 
+void ja4_master_merge_secret (int secret_id,
+                              const struct worker_top_ja4 *slots, int count) {
+  if (secret_id < 0 || secret_id >= JA4_SECRET_SLOTS_MAX) { return; }
+  struct worker_top_ja4 *table = master_secret_table[secret_id];
+  int *table_count = &master_secret_count[secret_id];
+  for (int i = 0; i < count; i++) {
+    if (slots[i].count == 0 || slots[i].hash[0] == '\0') { continue; }
+    int found = 0;
+    for (int j = 0; j < *table_count; j++) {
+      if (strcmp (table[j].hash, slots[i].hash) == 0) {
+        table[j].count += slots[i].count;
+        found = 1;
+        break;
+      }
+    }
+    if (!found && *table_count < MASTER_TOP_JA4_MAX) {
+      table[*table_count] = slots[i];
+      (*table_count)++;
+    }
+  }
+}
+
 static int master_cmp_desc (const void *a, const void *b) {
   const struct worker_top_ja4 *x = a, *y = b;
   if (x->count > y->count) { return -1; }
@@ -448,28 +520,48 @@ static int master_cmp_desc (const void *a, const void *b) {
   return 0;
 }
 
+int ja4_master_secret_snapshot (int secret_id, struct worker_top_ja4 *out,
+                                int max) {
+  if (secret_id < 0 || secret_id >= JA4_SECRET_SLOTS_MAX || max <= 0) {
+    return 0;
+  }
+  int n = master_secret_count[secret_id];
+  if (n <= 0) { return 0; }
+  qsort (master_secret_table[secret_id], n,
+         sizeof (master_secret_table[secret_id][0]), master_cmp_desc);
+  if (n > WORKER_TOP_JA4_PER_SECRET_MAX) {
+    n = WORKER_TOP_JA4_PER_SECRET_MAX;
+  }
+  if (n > max) { n = max; }
+  memcpy (out, master_secret_table[secret_id],
+          n * sizeof (struct worker_top_ja4));
+  return n;
+}
+
 void ja4_dump_stats (stats_buffer_t *sb) {
-  if (master_count == 0) { return; }
-  qsort (master_table, master_count, sizeof (master_table[0]), master_cmp_desc);
-  int n = master_count > WORKER_TOP_JA4_MAX ? WORKER_TOP_JA4_MAX : master_count;
-  for (int i = 0; i < n; i++) {
-    sb_printf (sb, "ja4_seen\t%s\t%llu\n",
-               master_table[i].hash,
-               (unsigned long long) master_table[i].count);
+  if (master_count > 0) {
+    qsort (master_table, master_count, sizeof (master_table[0]), master_cmp_desc);
+    int n = master_count > WORKER_TOP_JA4_MAX ? WORKER_TOP_JA4_MAX : master_count;
+    for (int i = 0; i < n; i++) {
+      sb_printf (sb, "ja4_seen\t%s\t%llu\n",
+                 master_table[i].hash,
+                 (unsigned long long) master_table[i].count);
+    }
   }
 }
 
 void ja4_dump_prometheus (stats_buffer_t *sb) {
-  if (master_count == 0) { return; }
-  qsort (master_table, master_count, sizeof (master_table[0]), master_cmp_desc);
-  int n = master_count > WORKER_TOP_JA4_MAX ? WORKER_TOP_JA4_MAX : master_count;
-  sb_printf (sb,
-             "# HELP teleproxy_ja4_seen ClientHello JA4 fingerprints observed (top 32 by count, aggregated across workers).\n"
-             "# TYPE teleproxy_ja4_seen counter\n");
-  for (int i = 0; i < n; i++) {
-    sb_printf (sb, "teleproxy_ja4_seen{hash=\"%s\"} %llu\n",
-               master_table[i].hash,
-               (unsigned long long) master_table[i].count);
+  if (master_count > 0) {
+    qsort (master_table, master_count, sizeof (master_table[0]), master_cmp_desc);
+    int n = master_count > WORKER_TOP_JA4_MAX ? WORKER_TOP_JA4_MAX : master_count;
+    sb_printf (sb,
+               "# HELP teleproxy_ja4_seen ClientHello JA4 fingerprints observed (top 32 by count, aggregated across workers).\n"
+               "# TYPE teleproxy_ja4_seen counter\n");
+    for (int i = 0; i < n; i++) {
+      sb_printf (sb, "teleproxy_ja4_seen{hash=\"%s\"} %llu\n",
+                 master_table[i].hash,
+                 (unsigned long long) master_table[i].count);
+    }
   }
 }
 

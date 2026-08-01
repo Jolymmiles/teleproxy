@@ -20,6 +20,8 @@
 /* JA4 string is always exactly 36 chars: "t13d1516h2_xxxxxxxxxxxx_xxxxxxxxxxxx". */
 #define JA4_HASH_BUF       37
 #define WORKER_TOP_JA4_MAX 32
+#define WORKER_TOP_JA4_PER_SECRET_MAX 4
+#define JA4_SECRET_SLOTS_MAX 32
 
 struct worker_top_ja4 {
   char hash[JA4_HASH_BUF];
@@ -40,12 +42,22 @@ int ja4_compute (const unsigned char *client_hello, int len, char out[JA4_HASH_B
  */
 void ja4_observe (const unsigned char *client_hello, int len);
 
+/* As above, but also returns the computed hash for later secret attribution. */
+int ja4_observe_with_hash (const unsigned char *client_hello, int len,
+                           char out[JA4_HASH_BUF]);
+
+/* Attribute an already-computed JA4 to a successfully matched secret slot. */
+void ja4_observe_secret (int secret_id, const char hash[JA4_HASH_BUF]);
+void ja4_clear_secret (int secret_id);
+
 /*
  *  Copy the worker-local top-N table into the caller's buffer.  Used by
  *  update_local_stats_copy to publish into shared worker_stats memory.
  *  Empty slots have count == 0 and an empty hash string.
  */
 void ja4_snapshot (struct worker_top_ja4 *out, int *count_out, int max);
+void ja4_secret_snapshot (int secret_id, struct worker_top_ja4 *out,
+                          int *count_out, int max);
 
 /*
  *  Master-side helpers, called from mtproto-proxy-stats.c.  reset() clears
@@ -54,6 +66,10 @@ void ja4_snapshot (struct worker_top_ja4 *out, int *count_out, int max);
  */
 void ja4_master_reset      (void);
 void ja4_master_merge      (const struct worker_top_ja4 *slots, int count);
+void ja4_master_merge_secret (int secret_id,
+                              const struct worker_top_ja4 *slots, int count);
+int ja4_master_secret_snapshot (int secret_id, struct worker_top_ja4 *out,
+                                int max);
 
 /*  Single-process convenience: reset the master accumulator and merge in
  *  the local worker table.  Used by mtfront_prepare_stats when workers=0
