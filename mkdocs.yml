@@ -86,6 +86,7 @@ plugins:
             Tuning: Тюнинг
             Testing: Тестирование
             Changelog: Журнал изменений
+            Donate: Поддержать
             Observatory: Обсерватория
         - locale: fa
           name: فارسی
@@ -117,6 +118,7 @@ plugins:
             Tuning: تنظیم عملکرد
             Testing: تست
             Changelog: تاریخچه تغییرات
+            Donate: حمایت مالی
             Observatory: رصدخانه
         - locale: vi
           name: Tiếng Việt
@@ -148,6 +150,7 @@ plugins:
             Tuning: Tinh chỉnh
             Testing: Kiểm thử
             Changelog: Nhật ký thay đổi
+            Donate: Ủng hộ
             Observatory: Quan sát
 
 markdown_extensions:
@@ -199,4 +202,5 @@ nav:
     - Cloud Deploy: https://teleproxy.github.io/deploy/
   - Testing: testing.md
   - Changelog: changelog.md
+  - Donate: donate.md
   - Observatory: https://teleproxy.github.io/observatory/

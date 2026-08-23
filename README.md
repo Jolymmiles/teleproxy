@@ -12,13 +12,14 @@ High-performance MTProto proxy for Telegram with DPI resistance, fake-TLS camouf
 **[Documentation](https://teleproxy.github.io)** | **[Docker Quick Start](https://teleproxy.github.io/docker/)** | **[Comparison](https://teleproxy.github.io/comparison/)** | **[Telegram](https://t.me/teleproxy_dev)**
 
 > [!NOTE]
-> Teleproxy is maintained by one person. If it's useful to you, consider supporting development.
+> Teleproxy is maintained by one person. If it's useful to you, consider [supporting development](https://teleproxy.github.io/donate/).
 >
 > | | |
 > |---|---|
 > | Telegram | **[Donate via Tribute](https://t.me/tribute/app?startapp=dIa9)** (cards, worldwide) |
 > | Web | **[Donate via Tribute](https://web.tribute.tg/d/Ia9)** |
-> | TON | `UQCRB931D__Q2YQmAbUfcuHQ7fHsG3_3At7e6pUtNa6b9bTh` ([Tonkeeper](https://app.tonkeeper.com/transfer/UQCRB931D__Q2YQmAbUfcuHQ7fHsG3_3At7e6pUtNa6b9bTh)) |
+> | TON (The Open Network) | `UQCRB931D__Q2YQmAbUfcuHQ7fHsG3_3At7e6pUtNa6b9bTh` ([Tonkeeper](https://app.tonkeeper.com/transfer/UQCRB931D__Q2YQmAbUfcuHQ7fHsG3_3At7e6pUtNa6b9bTh)) |
+> | USDT — TON network ONLY | same address as above (not TRC20/ERC20) |
 
 <details>
 <summary>🎵 Ghost Protocol — the unofficial anthem</summary>

@@ -182,6 +182,21 @@ article.md-content__inner:has(> .tx-hero:first-child) > *:not(.tx-hero):not(.fea
   line-height: 1.7;
 }
 
+/* ── Donation QR frame ────────────────────────────────────────────── */
+
+.donate-qr {
+  margin: 1.5rem 0;
+}
+
+.donate-qr img {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 10px;
+}
+
 /* ── Homepage bottom spacing ───────────────────────────────────────── */
 
 article.md-content__inner:has(> .tx-hero:first-child) {
