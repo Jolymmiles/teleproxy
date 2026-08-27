@@ -1188,15 +1188,23 @@ static void delete_old_client_randoms() {
     }
 
     struct client_random *entry = first_client_random;
-    assert (entry->next_by_hash == NULL);
 
     first_client_random = first_client_random->next_by_time;
 
+    /* The oldest-by-time entry is NOT necessarily the tail of its hash
+       bucket: clients choose their randoms, so bucket collisions under
+       load are attacker-craftable. Unlink safely instead of asserting. */
     struct client_random **cur = get_client_random_bucket (entry->random);
-    while (*cur != entry) {
+    while (*cur && *cur != entry) {
       cur = &(*cur)->next_by_hash;
     }
-    *cur = NULL;
+    if (*cur == NULL) {
+      /* Dropped from the time list but absent from its bucket: keep the
+         entry allocated rather than leaving a dangling bucket pointer. */
+      vkprintf (1, "client random cache: entry missing from hash bucket\n");
+      return;
+    }
+    *cur = entry->next_by_hash;
 
     free (entry);
   }
@@ -1896,56 +1904,28 @@ int tcp_rpcs_compact_parse_execute (connection_job_t C) {
 #endif
     }
 
-    int packet_len_bytes = 4;
-    if (D->flags & RPC_F_MEDIUM) {
-      /* Transport error codes: DCs send a raw negative 4-byte int
-         (e.g. -404, -429) in place of a normal packet length.
-         Detect before QUICKACK masking destroys the sign. */
-      if (packet_len < 0 && packet_len > -1000) {
-        vkprintf (1, "transport error %d from %s:%d\n", packet_len, show_remote_ip (C), c->remote_port);
+    struct obfs2_frame_result fr;
+    if (obfs2_parse_frame_length (packet_len, D->flags & (RPC_F_MEDIUM | RPC_F_PAD),
+                                  TCP_RPCS_FUNC(C)->max_packet_len, &fr) < 0) {
+      if (fr.status == OBFS2_FRAME_TRANSPORT_ERROR) {
+        vkprintf (1, "transport error %d from %s:%d\n", fr.parsed_len, show_remote_ip (C), c->remote_port);
         transport_errors_received++;
-        fail_connection (C, -1);
-        return 0;
+      } else if (fr.status == OBFS2_FRAME_OVERLONG) {
+        vkprintf (1, "error while parsing compact packet: got length %d in overlong encoding\n", fr.parsed_len);
+      } else {
+        vkprintf (1, "error while parsing packet: bad packet length %d\n", fr.parsed_len);
       }
-      D->flags = (D->flags & ~RPC_F_QUICKACK) | (packet_len & RPC_F_QUICKACK);
-      packet_len &= ~RPC_F_QUICKACK;
-      if (D->flags & RPC_F_QUICKACK) {
-        quickack_packets_received++;
-      }
+      fail_connection (C, -1);
+      return 0;
+    }
+    if (fr.quickack) {
+      D->flags |= RPC_F_QUICKACK;
+      quickack_packets_received++;
     } else {
-      /* compact mode */
-      if (packet_len & 0x80) {
-        D->flags |= RPC_F_QUICKACK;
-        packet_len &= ~0x80;
-        quickack_packets_received++;
-      } else {
-        D->flags &= ~RPC_F_QUICKACK;
-      }
-      if ((packet_len & 0xff) == 0x7f) {
-        packet_len = ((unsigned) packet_len >> 8);
-        if (packet_len < 0x7f) {
-          vkprintf (1, "error while parsing compact packet: got length %d in overlong encoding\n", packet_len);
-          fail_connection (C, -1);
-          return 0;
-        }
-      } else {
-        packet_len &= 0x7f;
-        packet_len_bytes = 1;
-      }
-      packet_len <<= 2;
+      D->flags &= ~RPC_F_QUICKACK;
     }
-
-    if (packet_len <= 0 || (packet_len & 0xc0000000) || (!(D->flags & RPC_F_PAD) && (packet_len & 3))) {
-      vkprintf (1, "error while parsing packet: bad packet length %d\n", packet_len);
-      fail_connection (C, -1);
-      return 0;
-    }
-
-    if ((packet_len > TCP_RPCS_FUNC(C)->max_packet_len && TCP_RPCS_FUNC(C)->max_packet_len > 0))  {
-      vkprintf (1, "error while parsing packet: bad packet length %d\n", packet_len);
-      fail_connection (C, -1);
-      return 0;
-    }
+    int packet_len_bytes = fr.header_bytes;
+    packet_len = fr.packet_len;
 
     if (len < packet_len + packet_len_bytes) {
       return packet_len + packet_len_bytes - len;

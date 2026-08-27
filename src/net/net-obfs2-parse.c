@@ -91,9 +91,15 @@ int obfs2_parse_frame_length (int raw4, int flags, int max_packet_len,
   int packet_len_bytes = 4;
   int quickack = 0;
 
+  result->status = OBFS2_FRAME_BAD_LENGTH;
+  result->parsed_len = packet_len;
+
   if (flags & RPC_F_MEDIUM) {
-    /* Transport error codes: negative small int */
+    /* Transport error codes: DCs send a raw negative 4-byte int
+       (e.g. -404, -429) in place of a normal packet length.
+       Detect before QUICKACK masking destroys the sign. */
     if (packet_len < 0 && packet_len > -1000) {
+      result->status = OBFS2_FRAME_TRANSPORT_ERROR;
       return -1;
     }
     quickack = !!(packet_len & RPC_F_QUICKACK);
@@ -107,6 +113,8 @@ int obfs2_parse_frame_length (int raw4, int flags, int max_packet_len,
     if ((packet_len & 0xff) == 0x7f) {
       packet_len = ((unsigned) packet_len >> 8);
       if (packet_len < 0x7f) {
+        result->status = OBFS2_FRAME_OVERLONG;
+        result->parsed_len = packet_len;
         return -1;  /* overlong encoding */
       }
     } else {
@@ -115,6 +123,8 @@ int obfs2_parse_frame_length (int raw4, int flags, int max_packet_len,
     }
     packet_len <<= 2;
   }
+
+  result->parsed_len = packet_len;
 
   if (packet_len <= 0 || (packet_len & 0xc0000000)) {
     return -1;
@@ -129,5 +139,6 @@ int obfs2_parse_frame_length (int raw4, int flags, int max_packet_len,
   result->packet_len = packet_len;
   result->header_bytes = packet_len_bytes;
   result->quickack = quickack;
+  result->status = OBFS2_FRAME_OK;
   return 0;
 }

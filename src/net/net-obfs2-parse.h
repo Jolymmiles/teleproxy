@@ -48,11 +48,21 @@ int obfs2_parse_header (unsigned char header[64],
                         int rand_pad_only,
                         struct obfs2_parse_result *result);
 
+/* Detailed outcome of obfs2_parse_frame_length; set on every return. */
+enum obfs2_frame_status {
+  OBFS2_FRAME_OK = 0,
+  OBFS2_FRAME_BAD_LENGTH = -1,       /* negative, huge or misaligned length */
+  OBFS2_FRAME_TRANSPORT_ERROR = -2,  /* medium mode: DC error code (-404, ...) */
+  OBFS2_FRAME_OVERLONG = -3          /* compact mode: 0x7f escape too short */
+};
+
 /* Frame length parsing result */
 struct obfs2_frame_result {
   int packet_len;        /* parsed packet length in bytes (always > 0) */
   int header_bytes;      /* number of header bytes consumed (1 or 4) */
-  int quickack;          /* 1 if QUICKACK flag was set */
+  int quickack;          /* 1 if QUICKACK flag was set (valid when OK) */
+  int status;            /* enum obfs2_frame_status, valid on every return */
+  int parsed_len;        /* post-transform length, for diagnostics */
 };
 
 /* Parse a frame length from the first 4 bytes of a decrypted obfs2 stream.
@@ -60,6 +70,9 @@ struct obfs2_frame_result {
    flags:  RPC_F_MEDIUM / RPC_F_PAD bits from the handshake tag
    max_packet_len: upper bound (0 = no limit)
 
-   Returns 0 on success (result populated), -1 on validation error. */
+   Returns 0 on success (result populated), -1 on validation error
+   (result->status / result->parsed_len say which rule rejected it).
+   QUICKACK extraction is reported, not applied: callers own their
+   connection flags and counters. */
 int obfs2_parse_frame_length (int raw4, int flags, int max_packet_len,
                               struct obfs2_frame_result *result);

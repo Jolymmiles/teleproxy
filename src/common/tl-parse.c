@@ -644,16 +644,25 @@ int tlf_query_header (struct tl_in_state *tlio_in, struct tl_query_header *heade
     int ok = 1;
     switch (op) {
     case RPC_DEST_ACTOR:
-      assert (tl_fetch_int () == (int)RPC_DEST_ACTOR);
+      if (tl_fetch_int () != (int)RPC_DEST_ACTOR) {
+        tl_fetch_set_error (TL_ERROR_HEADER, "Expected RPC_DEST_ACTOR");
+        return -1;
+      }
       header->actor_id = tl_fetch_long ();
       break;
     case RPC_DEST_ACTOR_FLAGS:
-      assert (tl_fetch_int () == (int)RPC_DEST_ACTOR_FLAGS);
+      if (tl_fetch_int () != (int)RPC_DEST_ACTOR_FLAGS) {
+        tl_fetch_set_error (TL_ERROR_HEADER, "Expected RPC_DEST_ACTOR_FLAGS");
+        return -1;
+      }
       header->actor_id = tl_fetch_long ();
       tlf_query_flags (tlio_in, header);
       break;
     case RPC_DEST_FLAGS:
-      assert (tl_fetch_int () == (int)RPC_DEST_FLAGS);      
+      if (tl_fetch_int () != (int)RPC_DEST_FLAGS) {
+        tl_fetch_set_error (TL_ERROR_HEADER, "Expected RPC_DEST_FLAGS");
+        return -1;
+      }
       tlf_query_flags (tlio_in, header);
       break;
     default:
@@ -708,7 +717,10 @@ int tlf_query_answer_header (struct tl_in_state *tlio_in, struct tl_query_header
       int op = tl_fetch_lookup_int ();
       switch (op) {
       case RPC_REQ_ERROR:
-        assert (tl_fetch_int () == RPC_REQ_ERROR);
+        if (tl_fetch_int () != RPC_REQ_ERROR) {
+          tl_fetch_set_error (TL_ERROR_HEADER, "Expected RPC_REQ_ERROR");
+          return -1;
+        }
         header->op = RPC_REQ_ERROR_WRAPPED;
         tl_fetch_long ();
         break;
@@ -716,7 +728,10 @@ int tlf_query_answer_header (struct tl_in_state *tlio_in, struct tl_query_header
         header->op = RPC_REQ_ERROR_WRAPPED;
         break;
       case RPC_REQ_RESULT_FLAGS:
-        assert (tl_fetch_int () == (int)RPC_REQ_RESULT_FLAGS);
+        if (tl_fetch_int () != (int)RPC_REQ_RESULT_FLAGS) {
+          tl_fetch_set_error (TL_ERROR_HEADER, "Expected RPC_REQ_RESULT_FLAGS");
+          return -1;
+        }
         tlf_query_answer_flags (tlio_in, header);
         break;
       default:

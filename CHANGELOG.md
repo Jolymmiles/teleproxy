@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.16.2] - 2026-08-27
+
+- Free the cloned request buffer when an HTTP connection is closed without
+  keep-alive. The close path bypassed every rwm_free branch and leaked one
+  raw message per request - remotely triggerable by scanner traffic.
+- Stop asserting on hash-bucket collisions when pruning the client-random
+  cache. Clients choose their randoms, so the oldest entry can share a bucket
+  with newer ones; the prune now unlinks safely instead of aborting the
+  process (asserts are enabled in production builds).
+- Convert side-effecting assert calls in the TL query/answer header parser
+  into proper TL_ERROR_HEADER parse errors. An unexpected RPC opcode in a
+  header chain no longer aborts the process; it is rejected like any other
+  malformed header.
+- Delegate the ext-server frame-length walk to obfs2_parse_frame_length.
+  The inline copy had diverged from the (previously dead, fuzzed) module
+  version; the module is now the single implementation and reports
+  status/parsed_len for exact diagnostics. Pinned by a differential test
+  (tests/test_obfs2_frame_length.c, 8M+ checks against the retired inline
+  algorithm). This also drops net-tcp-rpc-ext-server.c back under the
+  2000-line limit of .file-limits.
+
 ## [4.16.1] - 2026-08-01
 
 - Add bounded per-secret JA4 distributions alongside the global ClientHello

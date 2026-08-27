@@ -296,6 +296,7 @@ int hts_parse_execute (connection_job_t C) {
       if (!c->pending_queries && !(D->query_flags & QF_KEEPALIVE)) {
         connection_write_close (C);
         D->parse_state = -1;
+        rwm_free (&raw);
         return 0;
       }
       D->parse_state = htqp_start;

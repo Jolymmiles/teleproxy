@@ -41,3 +41,4 @@ observatory/
 
 # Branding assets (not tracked)
 branding/
+.unlazy/
